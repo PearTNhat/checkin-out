@@ -19,7 +19,7 @@ export const customChain = defineChain({
 })
 
 // Private Key của bạn. Viem yêu cầu chuỗi Hex phải luôn có tiền tố "0x" ở đầu
-const rawPrivateKey = "72aa91a272ca13df75f51127145ca538fed2b9c0a2157c7a751d4c1f79edf5ad"
+const rawPrivateKey = "41acc857cdc74215d5b5e1c4f497ef88409c8f095689f11930f1924efdf8bb12"
 const formattedPrivateKey = rawPrivateKey.startsWith("0x") ? rawPrivateKey : `0x${rawPrivateKey}`
 
 // Khởi tạo Account từ Private Key

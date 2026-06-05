@@ -44,44 +44,42 @@ function App() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
-      <div className="text-center p-8 bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-md">
-        <h1 className="text-4xl font-bold text-indigo-600 mb-6">
-          Auto Check-in/out
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+      <div className="text-center p-6 sm:p-8 bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-sm">
+        <h1 className="text-3xl font-extrabold text-slate-800 mb-6 tracking-tight">
+          Auto Check-in
         </h1>
         
-        <div className="mb-6 p-4 bg-indigo-50 rounded-xl text-left border border-indigo-100">
-          <p className="text-xs text-indigo-500 font-bold uppercase mb-2">Thông tin ví (Private Key):</p>
-          <p className="text-sm font-mono text-gray-800 break-all bg-white p-2 rounded border border-indigo-100">
+        <div className="mb-4 p-4 bg-slate-50 rounded-2xl text-left border border-slate-100">
+          <p className="text-xs text-slate-400 font-bold uppercase mb-1 tracking-wider">Thông tin ví</p>
+          <p className="text-xs font-mono text-slate-700 break-all bg-white p-2 rounded-xl border border-slate-100 shadow-sm">
             🟢 {account.address}
           </p>
         </div>
 
-        <div className="mb-6 p-4 bg-green-50 rounded-xl text-left border border-green-100">
-          <p className="text-xs text-green-600 font-bold uppercase mb-2">Tọa độ mục tiêu:</p>
-          <p className="text-sm font-mono text-gray-800 break-all bg-white p-2 rounded border border-green-100">
-            📍 {locationCoordinate}
+        <div className="mb-8 p-4 bg-blue-50 rounded-2xl text-left border border-blue-100 min-h-[80px]">
+          <p className="text-xs text-blue-400 font-bold uppercase mb-1 tracking-wider">Trạng thái giao dịch</p>
+          <p className="text-sm text-blue-900 whitespace-pre-line break-words font-medium">
+            {status || "Đang chờ lệnh..."}
           </p>
         </div>
 
-        <div className="mb-8 p-4 bg-gray-50 rounded-xl text-left border border-gray-200 min-h-[80px]">
-          <p className="text-xs text-gray-500 font-bold uppercase mb-2">Trạng thái giao dịch:</p>
-          <p className="text-sm text-gray-800 whitespace-pre-line break-words">
-            {status || "Sẵn sàng..."}
-          </p>
-        </div>
-
-        <div className="flex gap-4">
+        <div className="flex flex-col items-center gap-8 py-4">
+          {/* Nút Check-In */}
           <button
             onClick={handleCheckin}
-            className="flex-1 py-4 bg-green-500 hover:bg-green-600 text-white font-bold text-lg rounded-xl transition-all shadow-lg transform hover:-translate-y-1"
+            className="group relative flex items-center justify-center w-40 h-40 bg-gradient-to-tr from-emerald-400 to-teal-500 rounded-full text-white font-bold text-2xl shadow-[0_0_40px_rgba(52,211,153,0.4)] transition-all duration-300 transform hover:scale-105 active:scale-95 hover:shadow-[0_0_60px_rgba(52,211,153,0.6)]"
           >
+            <span className="absolute inset-0 w-full h-full rounded-full bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
             Check-In
           </button>
+
+          {/* Nút Check-Out */}
           <button
             onClick={handleCheckout}
-            className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-lg rounded-xl transition-all shadow-lg transform hover:-translate-y-1"
+            className="group relative flex items-center justify-center w-40 h-40 bg-gradient-to-tr from-rose-400 to-pink-500 rounded-full text-white font-bold text-2xl shadow-[0_0_40px_rgba(251,113,133,0.4)] transition-all duration-300 transform hover:scale-105 active:scale-95 hover:shadow-[0_0_60px_rgba(251,113,133,0.6)]"
           >
+            <span className="absolute inset-0 w-full h-full rounded-full bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
             Check-Out
           </button>
         </div>
