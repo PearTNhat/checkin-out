@@ -1,26 +1,15 @@
 import { useState } from 'react'
 import { walletClient, account } from './viemClient'
-import { encodeAbiParameters } from 'viem'
 
 function App() {
   const [status, setStatus] = useState("")
   
   const contractAddress = "0x58435829e890cf83d4e2ec09a756dbe5a06bd280"
-  const locationCoordinate = "10.778689751650575-106.75161302089693"
 
-  const sendTx = async (actionName, selector) => {
+  const sendTx = async (actionName, inputDataStr) => {
     try {
       setStatus(`⏳ Đang gửi giao dịch ${actionName} lên mạng lưới...`)
       
-      // Tự động encode mảng string tọa độ thành Hex (chuẩn ABI)
-      const encodedParams = encodeAbiParameters(
-        [{ type: 'string[]' }],
-        [[locationCoordinate]]
-      )
-      
-      // Ghép selector (4 bytes đầu) với parameter
-      const inputDataStr = selector + encodedParams.slice(2)
-
       const hash = await walletClient.sendTransaction({
         to: contractAddress,
         data: inputDataStr
@@ -34,13 +23,15 @@ function App() {
   }
 
   const handleCheckin = () => {
-    // Selector của hàm checkin (từ data 0x5fdec8a2...)
-    sendTx("Check-In", "0x5fdec8a2")
+    // Dữ liệu input cứng cho hàm Check-in
+    const checkinData = "0x5fdec8a2000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000002531302e3737383638393735313635303537352d3130362e3735313631333032303839363933000000000000000000000000000000000000000000000000000000"
+    sendTx("Check-In", checkinData)
   }
 
   const handleCheckout = () => {
-    // Selector của hàm checkout (từ data 0xdcdbf380...)
-    sendTx("Check-Out", "0xdcdbf380")
+    // Dữ liệu input cứng cho hàm Check-out
+    const checkoutData = "0xdcdbf380000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000002531302e3737383638393735313635303537352d3130362e3735313631333032303839363933000000000000000000000000000000000000000000000000000000"
+    sendTx("Check-Out", checkoutData)
   }
 
   return (
