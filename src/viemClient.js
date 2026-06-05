@@ -13,8 +13,8 @@ export const customChain = defineChain({
     symbol: 'ETH',
   },
   rpcUrls: {
-    default: { http: ['http://139.59.243.85:8545'] },
-    public: { http: ['http://139.59.243.85:8545'] },
+    default: { http: ['/rpc'] },
+    public: { http: ['/rpc'] },
   },
 })
 
