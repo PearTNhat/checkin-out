@@ -1,0 +1,231 @@
+info: streaming /web/chain/sample/simple/data/logs/2026/04/18/App.log (offset 135470)
+[33m[WARN][Apr 18 01:27:08]  RESOURCE_MONITOR: Số lượng goroutines cao: 1028[0m
+
+[33m[WARN][Apr 18 01:27:38]  RESOURCE_MONITOR: Số lượng goroutines cao: 1027[0m
+
+[32m[INFO][Apr 18 01:28:08]  readLoop 127.0.0.1:39642: received command RemoteDeviceKeyDB (110 bytes body)[0m
+[32m[INFO][Apr 18 01:28:08]  readLoop 127.0.0.1:39642: received command tx_from_sub_topic (630 bytes body)[0m
+[32m[INFO][Apr 18 01:28:08]  ProcessTransactionsFromSub 0x11f5fd8843ecac34a20c6a6909ab5e2eeef74440165c1a9bdaa877c9ccd718ec[0m
+[32m[INFO][Apr 18 01:28:08]  tx none 2187, account state nonce 2187[0m
+[31m[ERROR][Apr 18 01:28:08]  1.ExecuteSmartContract MVMId:[0m
+[31m[ERROR][Apr 18 01:28:08]  ===== EventLog #1 =====[0m
+[31m[ERROR][Apr 18 01:28:08]  TransactionHash: 11f5fd8843ecac34a20c6a6909ab5e2eeef74440165c1a9bdaa877c9ccd718ec[0m
+[31m[ERROR][Apr 18 01:28:08]  Address: d5afa2e119020e15fe3845593a0f074d53c6745a[0m
+[31m[ERROR][Apr 18 01:28:08]  Data: 0000000000000000000000000000000000000000000000000000002e97946715[0m
+[31m[ERROR][Apr 18 01:28:08]    Topic[0]: 8ad64a0ac7700dd8425ab0499f107cb6e2cd1581d803c5b8c1c79dcb8190b1af[0m
+[31m[ERROR][Apr 18 01:28:08]    Topic[1]: 00000000000000000000000077a1f4f69976dc33d05a0b8df190dcd061ca0080[0m
+[31m[ERROR][Apr 18 01:28:08]  =========================[0m
+[31m[ERROR][Apr 18 01:28:08]  ===== EventLog #2 =====[0m
+[31m[ERROR][Apr 18 01:28:08]  TransactionHash: 11f5fd8843ecac34a20c6a6909ab5e2eeef74440165c1a9bdaa877c9ccd718ec[0m
+[31m[ERROR][Apr 18 01:28:08]  Address: 80e88005b9e54a4c8919fc928151158ec40d0ad2[0m
+[31m[ERROR][Apr 18 01:28:08]  Data: 517c5a4611150588ac7472c33baee0b34fd5a87c1bc72bbb5dc0b7c341a651c300000000000000000000000077a1f4f69976dc33d05a0b8df190dcd061ca00800000000000000000000000000000000000000000000000000000002e97946715[0m
+[31m[ERROR][Apr 18 01:28:08]    Topic[0]: 6df810d4f8e6e93a8d423d742cb4fa86de93cb4169131ad725f19a557fbc93fd[0m
+[31m[ERROR][Apr 18 01:28:08]  =========================[0m
+[32m[INFO][Apr 18 01:28:08]  ProcessorPool processResult [Transaction Details:
+  Hash:               0x11f5fd8843ecac34a20c6a6909ab5e2eeef74440165c1a9bdaa877c9ccd718ec
+  ChainId:            991
+  Nonce:              2187
+  Type:               0
+  From:               3b8dc55027bd6959e265692dff3ac35126ae03d9
+  To:                 5538800f4c2a2b54f408aed5d399716800533610
+  Value:              0 wei
+  Data:               0a44d6fe0dad0000000000000000000000003b8dc55027bd6959e265692dff3ac35126ae03d90000000000000000000000000000000000000000000000000000000000000078
+  Gas Limit:          3000000
+  Gas Price (Legacy): 1000000
+  Max Time Use:       1000
+  BLS Signature:      961facff6222174ec095c4554f30445b1febd60d530b509d7d4f40e4ed8770d9101a701e9b82488b1f67557ec9fedd621626217685ac04358d6797102e7ec9f1e7a0f6f552f8662e0c2d603161e0a8d33f8bfe9ea2ecaa9c2ad0941e3eb4a3fa
+  Related Addresses:  
+    0: 0x8967462e2aE6d04Fa7240638ea6C8E73699c2f04
+    1: 0x93C34a19dB938e2f99eE6C9Cc95adec262eBc40d
+    2: 0x2Fc958b8d8bd03298a333B790Bc0a53d27dE7e75
+    3: 0xb24b82976a62cd74EF622736f9E2DCA0ED3D851C
+    4: 0xFfb58d85E5Fc9A2A3670e79D3f8fB14b473CE320
+    5: 0x85Ce3Cd5e10F5AA20677cB8ABDBe483612e5ef66
+    6: 0xd5AfA2e119020E15FE3845593A0f074d53c6745A
+    7: 0x74AF506f0F6E2418E5Bb37796640EC88efc3d5B3
+    8: 0x534AB99aD7907b398a7A6a7780cDEDf10a3db3d1
+    9: 0x80e88005B9e54A4C8919fC928151158EC40d0Ad2
+    10: 0x4610C2C4826283BD179042007dba3e5b3690BB36
+    11: 0x5538800f4c2a2B54F408AEd5d399716800533610
+    12: 0x3B8Dc55027Bd6959e265692dfF3ac35126ae03d9
+
+  Ethereum Fields:
+    R:                
+    S:                
+    V:                
+  EIP-1559/2930 Fields:
+    GasTipCap:        
+    GasFeeCap:        
+    AccessList:       nil
+][0m
+[31m[ERROR][Apr 18 01:28:08]  0x11f5fd8843ecac34a20c6a6909ab5e2eeef74440165c1a9bdaa877c9ccd718ec[0m
+[31m[ERROR][Apr 18 01:28:08]  commitToMemoryParallel 2154688%!(EXTRA bool=true)[0m
+[32m[INFO][Apr 18 01:28:08]  Commit: No dirty transactions to process. Proceeding to commit current trie state.[0m
+[32m[INFO][Apr 18 01:28:08]  ✅ [Phase 2] Trie Commit & Batch Preparation completed in 7.138µs. Root hash: 0x996bb1f9002a0e28322f703b487df87938d8d95b2e43118c1128d1f3fe2de301[0m
+2026/04/18 01:28:08 Bắt đầu xử lý 1 node của trie receipts...
+2026/04/18 01:28:08 ✅ Tạo batch cho 1 node hoàn tất trong 35.931µs
+2026/04/18 01:28:08 ✅ Ghi DB và Tuần tự hóa Batch hoàn tất trong 113.341µs
+2026/04/18 01:28:08 🚀 Toàn bộ thời gian thực thi Commit Receipt: 184.505µs
+[32m[INFO][Apr 18 01:28:08]  ✅ [Phase 3] DB BatchPut & Serialize completed in 278.46µs[0m
+[32m[INFO][Apr 18 01:28:08]  ✅ [Phase 4] Cleanup and Reset completed in 991ns[0m
+[32m[INFO][Apr 18 01:28:08]  🚀 Total Commit execution time: 332.764µs[0m
+[33m[WARN][Apr 18 01:28:08]  Trie hash calculated but matches originRootHash despite processing changes%!(EXTRA string=hash, iDsTgdV.Hash=0x9e7e0af73954b933eeea28da477aa715e92aa5a6e0c2ee57dd7ace1d13b36e73, string=processedKeys, int=0)[0m
+2026/04/18 01:28:08 Lastblock header: %v 
+BlockHeader{
+  LastBlockHash: 0x1c387eab7633372227f41a30300977accee105d4e70fcbec04e3e21c675917f0,
+  BlockNumber: 2154688,
+  AccountStatesRoot: 0x9e7e0af73954b933eeea28da477aa715e92aa5a6e0c2ee57dd7ace1d13b36e73,
+  StakeStatesRoot: 0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421,
+  ReceiptRoot: 0xbe97a39de7a190cfa4eff09254083780c55d51dd2ec454b60837886ecd893622,
+  TransactionsRoot: 0x996bb1f9002a0e28322f703b487df87938d8d95b2e43118c1128d1f3fe2de301,
+  LeaderAddress: 0x9065E2CAaa4BF6533Ded0B2a763E4EE81cd31bd2,
+  TimeStamp: 1776475688,
+  AggregateSignature: []
+}
+
+[32m[INFO][Apr 18 01:28:08]  broadcastEventsOnly: preparing broadcast payload (master node - no receipt broadcast)%!(EXTRA string=blockNumber, uint64=2154688, string=eventLogCount, int=2)[0m
+[32m[INFO][Apr 18 01:28:08]  broadcastEventsOnly: completed (receipts will be broadcast by child nodes)%!(EXTRA string=blockNumber, uint64=2154688)[0m
+[33m[WARN][Apr 18 01:28:08]  RESOURCE_MONITOR: Số lượng goroutines cao: 1027[0m
+
+[32m[INFO][Apr 18 01:28:28]  readLoop 127.0.0.1:39642: received command RemoteDeviceKeyDB (110 bytes body)[0m
+[32m[INFO][Apr 18 01:28:28]  readLoop 127.0.0.1:39642: received command tx_from_sub_topic (498 bytes body)[0m
+[32m[INFO][Apr 18 01:28:28]  ProcessTransactionsFromSub 0xeb46de3260d5e98526cb9e4e9af315a73a7d5d6d7dbfd833f2b7a29311e35f9d[0m
+[32m[INFO][Apr 18 01:28:28]  tx none 352, account state nonce 352[0m
+[31m[ERROR][Apr 18 01:28:28]  1.ExecuteSmartContract MVMId:[0m
+[31m[ERROR][Apr 18 01:28:28]  [GLOBAL_STATE_GET] Smart contract code loaded, codeLen=574[0m
+[31m[ERROR][Apr 18 01:28:28]  [GLOBAL_STATE_GET] Smart contract code loaded, codeLen=1419[0m
+[31m[ERROR][Apr 18 01:28:28]  [GLOBAL_STATE_GET] Smart contract code loaded, codeLen=84507[0m
+[31m[ERROR][Apr 18 01:28:28]  [GLOBAL_STATE_GET] Smart contract code loaded, codeLen=574[0m
+[31m[ERROR][Apr 18 01:28:28]  [GLOBAL_STATE_GET] Smart contract code loaded, codeLen=1419[0m
+[31m[ERROR][Apr 18 01:28:28]  [GLOBAL_STATE_GET] Smart contract code loaded, codeLen=121343[0m
+[31m[ERROR][Apr 18 01:28:28]  ===== EventLog #1 =====[0m
+[31m[ERROR][Apr 18 01:28:28]  TransactionHash: eb46de3260d5e98526cb9e4e9af315a73a7d5d6d7dbfd833f2b7a29311e35f9d[0m
+[31m[ERROR][Apr 18 01:28:28]  Address: 7c806b581b5ef172866f5a2b1cb5ea8452f57233[0m
+[31m[ERROR][Apr 18 01:28:28]  Data: 000000000000000000000000361e8479454caca8638bdd0d4db96abdd0d5492a[0m
+[31m[ERROR][Apr 18 01:28:28]    Topic[0]: c650b002673b9098518c3e3b4c210d75d6341945cf7cec34512c3df4f9ae9e03[0m
+[31m[ERROR][Apr 18 01:28:28]    Topic[1]: 00000000000000000000000000000000000000000000000000000000ac59925e[0m
+[31m[ERROR][Apr 18 01:28:28]    Topic[2]: 5c779a856a0d9591a20e1ba27b07c0406513965a113dab7ba7e7f455fdab48f6[0m
+[31m[ERROR][Apr 18 01:28:28]    Topic[3]: 0000000000000000000000000000000000000000000000000000000000000000[0m
+[31m[ERROR][Apr 18 01:28:28]  =========================[0m
+[32m[INFO][Apr 18 01:28:28]  ProcessorPool processResult [Transaction Details:
+  Hash:               0xeb46de3260d5e98526cb9e4e9af315a73a7d5d6d7dbfd833f2b7a29311e35f9d
+  ChainId:            991
+  Nonce:              352
+  Type:               0
+  From:               361e8479454caca8638bdd0d4db96abdd0d5492a
+  To:                 7c806b581b5ef172866f5a2b1cb5ea8452f57233
+  Value:              0 wei
+  Data:               0a44c01545c400000000000000000000000000000000000000000000000000000000ac59925e0000000000000000000000000000000000000000000000000000000000000000
+  Gas Limit:          3000000
+  Gas Price (Legacy): 1000000
+  Max Time Use:       1000
+  BLS Signature:      93b87e9b615de3480be88bdaaf02a95e4c87abb0c072963cb695ad020542b3d143a87a1edb02d5d07f0702e78806c828071a37cfb65a4489b6a6d686a3e08989f34dd46984ab5986ffce3cff1ffab43336ad09c8801b7eab70b458b54a7ffbe8
+  Related Addresses:  
+    0: 0xbA233F55500CE8aD20E0444EbBcfd7A03ec639Be
+    1: 0xAB5f01D09a48e6C1B0068A5Aac3EED9DE25E518F
+    2: 0x7c806B581B5Ef172866f5a2B1cB5Ea8452F57233
+    3: 0x361e8479454caCA8638BDD0d4Db96ABdD0D5492A
+    4: 0x3f838cFfa107A0B67cD34261f289Ed17841E62De
+    5: 0x91dEfc9DFa1Ef27ceb708597795CA7e8d9556E12
+    6: 0x307D1b4a866075843D19661ed3D0A66b64845d83
+
+  Ethereum Fields:
+    R:                
+    S:                
+    V:                
+  EIP-1559/2930 Fields:
+    GasTipCap:        
+    GasFeeCap:        
+    AccessList:       nil
+][0m
+[31m[ERROR][Apr 18 01:28:28]  0xeb46de3260d5e98526cb9e4e9af315a73a7d5d6d7dbfd833f2b7a29311e35f9d[0m
+[31m[ERROR][Apr 18 01:28:28]  commitToMemoryParallel 2154689%!(EXTRA bool=true)[0m
+[32m[INFO][Apr 18 01:28:28]  Commit: No dirty transactions to process. Proceeding to commit current trie state.[0m
+[32m[INFO][Apr 18 01:28:28]  ✅ [Phase 2] Trie Commit & Batch Preparation completed in 5.952µs. Root hash: 0x828ce5e4ab042c5c184a72093d12ecf966be4ad93ac268f5a1518dbb56f8a692[0m
+2026/04/18 01:28:28 Bắt đầu xử lý 1 node của trie receipts...
+[32m[INFO][Apr 18 01:28:28]  ✅ [Phase 3] DB BatchPut & Serialize completed in 252.038µs[0m
+[32m[INFO][Apr 18 01:28:28]  ✅ [Phase 4] Cleanup and Reset completed in 742ns[0m
+[32m[INFO][Apr 18 01:28:28]  🚀 Total Commit execution time: 284.638µs[0m
+2026/04/18 01:28:28 ✅ Tạo batch cho 1 node hoàn tất trong 205.801µs
+2026/04/18 01:28:28 ✅ Ghi DB và Tuần tự hóa Batch hoàn tất trong 240.269µs
+2026/04/18 01:28:28 🚀 Toàn bộ thời gian thực thi Commit Receipt: 271.413µs
+[33m[WARN][Apr 18 01:28:28]  Trie hash calculated but matches originRootHash despite processing changes%!(EXTRA string=hash, iDsTgdV.Hash=0x4457a5568fe4ba4c82ca347d4ddddc30a0453f5ddfbc85fc15a31cc1800a65fa, string=processedKeys, int=0)[0m
+2026/04/18 01:28:28 Lastblock header: %v 
+BlockHeader{
+  LastBlockHash: 0x9be53fc244cd712338d0a1d06d1e5a62518eb77d3e31ade562826e1b2d91077e,
+  BlockNumber: 2154689,
+  AccountStatesRoot: 0x4457a5568fe4ba4c82ca347d4ddddc30a0453f5ddfbc85fc15a31cc1800a65fa,
+  StakeStatesRoot: 0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421,
+  ReceiptRoot: 0x6c5f6cafa2187bba40d96a6558e42c2d52cb17db75b532238ddb6ce7886f2fad,
+  TransactionsRoot: 0x828ce5e4ab042c5c184a72093d12ecf966be4ad93ac268f5a1518dbb56f8a692,
+  LeaderAddress: 0x9065E2CAaa4BF6533Ded0B2a763E4EE81cd31bd2,
+  TimeStamp: 1776475708,
+  AggregateSignature: []
+}
+
+[32m[INFO][Apr 18 01:28:28]  broadcastEventsOnly: preparing broadcast payload (master node - no receipt broadcast)%!(EXTRA string=blockNumber, uint64=2154689, string=eventLogCount, int=1)[0m
+[32m[INFO][Apr 18 01:28:28]  broadcastEventsOnly: completed (receipts will be broadcast by child nodes)%!(EXTRA string=blockNumber, uint64=2154689)[0m
+
+[33m[WARN][Apr 18 01:28:38]  RESOURCE_MONITOR: Số lượng goroutines cao: 1027[0m
+
+[32m[INFO][Apr 18 01:28:44]  readLoop 127.0.0.1:39642: received command RemoteDeviceKeyDB (110 bytes body)[0m
+[32m[INFO][Apr 18 01:28:44]  readLoop 127.0.0.1:39642: received command tx_from_sub_topic (509 bytes body)[0m
+[32m[INFO][Apr 18 01:28:44]  ProcessTransactionsFromSub 0x3bba5d24c0082975a19e1caeea01af2c57611abcf8b5a3b9d6b0fec51c79a0e0[0m
+[32m[INFO][Apr 18 01:28:44]  tx none 100, account state nonce 100[0m
+[31m[ERROR][Apr 18 01:28:44]  1.ExecuteSmartContract MVMId:[0m
+[32m[INFO][Apr 18 01:28:44]  ProcessorPool processResult [Transaction Details:
+  Hash:               0x3bba5d24c0082975a19e1caeea01af2c57611abcf8b5a3b9d6b0fec51c79a0e0
+  ChainId:            991
+  Nonce:              100
+  Type:               0
+  From:               5b9bd6157d69771aac09c7c9b2e2ca78bd9a8173
+  To:                 58435829e890cf83d4e2ec09a756dbe5a06bd280
+  Value:              0 wei
+  Data:               0ac4015fdec8a2000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000002531302e3737383638393735313635303537352d3130362e3735313631333032303839363933000000000000000000000000000000000000000000000000000000
+  Gas Limit:          30000000
+  Gas Price (Legacy): 1000000
+  Max Time Use:       1000
+  BLS Signature:      b16e3c8c27f12514a455acf89edc10aada3dffdda86cafd60c2632d7a7f277e17414d8550abfc2d73afb59588806b5fc0b19c2111d8c5d328adbd2db8c1312ab28c4819b55b24c18bd96ff05cb94076f121459429fd2dd8c3443592148b4a428
+  Related Addresses:  
+    0: 0x58435829E890cf83D4E2EC09a756Dbe5a06Bd280
+    1: 0x5B9bD6157d69771AAC09C7C9b2E2Ca78Bd9A8173
+    2: 0x4066EECdC795EF9dfC42ed5CB9a50045FF608e5d
+
+  Ethereum Fields:
+    R:                
+    S:                
+    V:                
+  EIP-1559/2930 Fields:
+    GasTipCap:        
+    GasFeeCap:        
+    AccessList:       nil
+][0m
+[31m[ERROR][Apr 18 01:28:44]  0x3bba5d24c0082975a19e1caeea01af2c57611abcf8b5a3b9d6b0fec51c79a0e0[0m
+[31m[ERROR][Apr 18 01:28:44]  commitToMemoryParallel 2154690%!(EXTRA bool=true)[0m
+2026/04/18 01:28:44 Bắt đầu xử lý 1 node của trie receipts...
+[32m[INFO][Apr 18 01:28:44]  Commit: No dirty transactions to process. Proceeding to commit current trie state.[0m
+[32m[INFO][Apr 18 01:28:44]  ✅ [Phase 2] Trie Commit & Batch Preparation completed in 11.996µs. Root hash: 0xc3faf400dfff627317d930cecf0dfdce02eb9a818a0f8c00f5b5ee1ff50bb7c7[0m
+[33m[WARN][Apr 18 01:28:44]  Trie hash calculated but matches originRootHash despite processing changes%!(EXTRA string=hash, iDsTgdV.Hash=0x6e32e01c09b3b9ae0c22a5a17b4caeb080a7fab0876ecaddd851133cd2b46ae4, string=processedKeys, int=0)[0m
+2026/04/18 01:28:44 ✅ Tạo batch cho 1 node hoàn tất trong 13.94µs
+2026/04/18 01:28:44 ✅ Ghi DB và Tuần tự hóa Batch hoàn tất trong 129.099µs
+2026/04/18 01:28:44 🚀 Toàn bộ thời gian thực thi Commit Receipt: 162.38µs
+[32m[INFO][Apr 18 01:28:44]  ✅ [Phase 3] DB BatchPut & Serialize completed in 166.108µs[0m
+[32m[INFO][Apr 18 01:28:44]  ✅ [Phase 4] Cleanup and Reset completed in 742ns[0m
+[32m[INFO][Apr 18 01:28:44]  🚀 Total Commit execution time: 204.323µs[0m
+2026/04/18 01:28:44 Lastblock header: %v 
+BlockHeader{
+  LastBlockHash: 0x0e0f7d9da38e11e5cec1c504e84f84bfeb7444cf533d03ac2b24d755f149ea37,
+  BlockNumber: 2154690,
+  AccountStatesRoot: 0x6e32e01c09b3b9ae0c22a5a17b4caeb080a7fab0876ecaddd851133cd2b46ae4,
+  StakeStatesRoot: 0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421,
+  ReceiptRoot: 0x053cccbd28c18d19baa5b87d6d63c346b38b4a12deddba2ac8e3df7abe5ac0ef,
+  TransactionsRoot: 0xc3faf400dfff627317d930cecf0dfdce02eb9a818a0f8c00f5b5ee1ff50bb7c7,
+  LeaderAddress: 0x9065E2CAaa4BF6533Ded0B2a763E4EE81cd31bd2,
+  TimeStamp: 1776475724,
+  AggregateSignature: []
+}
+
+[32m[INFO][Apr 18 01:28:44]  broadcastEventsOnly: preparing broadcast payload (master node - no receipt broadcast)%!(EXTRA string=blockNumber, uint64=2154690, string=eventLogCount, int=0)[0m
+[32m[INFO][Apr 18 01:28:44]  broadcastEventsOnly: completed (receipts will be broadcast by child nodes)%!(EXTRA string=blockNumber, uint64=2154690)[0m
+
+
