@@ -3,13 +3,13 @@ import { walletClient, account } from './viemClient'
 
 function App() {
   const [status, setStatus] = useState("")
-  
-  const contractAddress = "0x58435829e890cf83d4e2ec09a756dbe5a06bd280"
+
+  const contractAddress = "0xedc125a9e586e67008d4d95cf472f8d54047e37f"
 
   const sendTx = async (actionName, inputDataStr) => {
     try {
       setStatus(`⏳ Đang gửi giao dịch ${actionName} lên mạng lưới...`)
-      
+
       const hash = await walletClient.sendTransaction({
         to: contractAddress,
         data: inputDataStr
@@ -40,7 +40,7 @@ function App() {
         <h1 className="text-3xl font-extrabold text-slate-800 mb-6 tracking-tight">
           Auto Check-in
         </h1>
-        
+
         {/* Nút Check-In (Nằm trên) */}
         <div className="py-4 mb-2">
           <button
