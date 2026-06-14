@@ -3,6 +3,9 @@ import { walletClient, account } from './viemClient'
 
 function App() {
   const [status, setStatus] = useState("")
+  const [popup, setPopup] = useState({ isOpen: false, type: "", title: "", message: "" })
+
+  const closePopup = () => setPopup({ ...popup, isOpen: false })
 
   const contractAddress = "0xedc125a9e586e67008d4d95cf472f8d54047e37f"
 
@@ -16,9 +19,21 @@ function App() {
       })
 
       setStatus(`✅ Giao dịch ${actionName} đã gửi thành công!\nHash: ${hash}`)
+      setPopup({
+        isOpen: true,
+        type: "success",
+        title: "Thành công!",
+        message: `Giao dịch ${actionName} đã gửi thành công!\nHash: ${hash}`
+      })
     } catch (error) {
       console.error(error)
       setStatus(`❌ Lỗi: ${error.shortMessage || error.message}`)
+      setPopup({
+        isOpen: true,
+        type: "error",
+        title: "Lỗi giao dịch",
+        message: error.shortMessage || error.message
+      })
     }
   }
 
@@ -77,6 +92,33 @@ function App() {
           </button>
         </div>
       </div>
+
+      {/* Popup Modal */}
+      {popup.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm transition-opacity">
+          <div className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full transform transition-all scale-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${popup.type === 'success' ? 'bg-emerald-100 text-emerald-500' : 'bg-rose-100 text-rose-500'}`}>
+              {popup.type === 'success' ? (
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              )}
+            </div>
+            <h3 className="text-xl font-bold text-center text-slate-800 mb-2">{popup.title}</h3>
+            <p className="text-sm text-slate-600 text-center mb-6 break-words whitespace-pre-line">{popup.message}</p>
+            <button
+              onClick={closePopup}
+              className="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-xl transition-colors active:scale-95"
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
