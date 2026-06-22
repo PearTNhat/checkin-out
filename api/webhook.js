@@ -2,6 +2,9 @@ import { createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { defineChain } from 'viem'
 
+// Bỏ qua lỗi chứng chỉ SSL của server Blockchain
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 // Khai báo cấu hình mạng lưới tùy chỉnh
 const customChain = defineChain({
   id: 991,
