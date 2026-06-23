@@ -2,14 +2,21 @@ export default async function handler(req, res) {
   // Xác định thời gian hiện tại ở Việt Nam (UTC+7)
   const vnTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }));
   const hour = vnTime.getHours();
+  const minute = vnTime.getMinutes();
+  const timeString = `${hour}h${minute < 10 ? '0' + minute : minute}`;
 
   let message = "⏰ Đã đến giờ!";
-  if (hour === 8) {
-    message = "🚨 Xin chào! Đã 8h05, hãy nhớ CHECK-IN nhé!";
-  } else if (hour === 18) {
-    message = "🚨 Chào buổi tối! Đã 18h15, hãy nhớ CHECK-OUT nhé!";
+  let isCheckIn = true;
+
+  if (hour === 7 || hour === 8) {
+    message = `🚨 Xin chào! Bây giờ là ${timeString}, hãy nhớ CHECK-IN nhé!`;
+    isCheckIn = true;
+  } else if (hour === 17 || hour === 18) {
+    message = `🚨 Chào buổi tối! Bây giờ là ${timeString}, hãy nhớ CHECK-OUT nhé!`;
+    isCheckIn = false;
   } else {
-    message = "🧪 Tin nhắn Test Cron từ Vercel (Mỗi 1 phút) - Vui lòng test thử nút bấm!";
+    message = `🧪 Tin nhắn Test Cron (Bây giờ là ${timeString}) - Vui lòng test thử nút bấm!`;
+    isCheckIn = true;
   }
 
   const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -32,8 +39,8 @@ export default async function handler(req, res) {
           inline_keyboard: [
             [
               { 
-                text: hour === 8 ? "🚀 Tiến hành Check-In" : "🚀 Tiến hành Check-Out", 
-                callback_data: hour === 8 ? "action_checkin" : "action_checkout" 
+                text: isCheckIn ? "🚀 Tiến hành Check-In" : "🚀 Tiến hành Check-Out", 
+                callback_data: isCheckIn ? "action_checkin" : "action_checkout" 
               }
             ]
           ]
