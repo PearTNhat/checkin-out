@@ -1,0 +1,23 @@
+{
+	"folders": [
+		{
+			"path": "../../go-project/metanode"
+		},
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"rust-analyzer.linkedProjects": [
+			"consensus/metanode/Cargo.toml"
+		],
+		"rust-analyzer.cargo.buildScripts.enable": true,
+		"rust-analyzer.procMacro.enable": true,
+		"rust-analyzer.cachePriming.enable": false,
+		"rust-analyzer.cargo.features": "default",
+		"rust-analyzer.check.workspace": false,
+		"rust-analyzer.server.extraEnv": {
+			"MALLOC_ARENA_MAX": "1"
+		}
+	}
+}
