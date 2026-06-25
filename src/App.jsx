@@ -1,13 +1,46 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { walletClient, account } from './viemClient'
+import { PASSWORD_HASH, hashPassword } from './auth'
 
 function App() {
   const [status, setStatus] = useState("")
   const [popup, setPopup] = useState({ isOpen: false, type: "", title: "", message: "" })
+  const [password, setPassword] = useState("")
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [loginError, setLoginError] = useState("")
+
+  const contractAddress = "0xedc125a9e586e67008d4d95cf472f8d54047e37f"
+
+  useEffect(() => {
+    // Kiểm tra xem đã có mật khẩu băm lưu trong localStorage chưa
+    const savedHash = localStorage.getItem('app_auth_hash')
+    if (savedHash === PASSWORD_HASH) {
+      setIsAuthenticated(true)
+    }
+  }, [])
 
   const closePopup = () => setPopup({ ...popup, isOpen: false })
 
-  const contractAddress = "0xedc125a9e586e67008d4d95cf472f8d54047e37f"
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    if (password.trim() !== "") {
+      const inputHash = await hashPassword(password)
+      if (inputHash === PASSWORD_HASH) {
+        localStorage.setItem('app_auth_hash', inputHash)
+        setIsAuthenticated(true)
+        setLoginError("")
+      } else {
+        setLoginError("Mật khẩu không đúng!")
+      }
+    }
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('app_auth_hash')
+    setPassword("")
+    setIsAuthenticated(false)
+    setStatus("")
+  }
 
   const sendTx = async (actionName, inputDataStr) => {
     try {
@@ -38,25 +71,70 @@ function App() {
   }
 
   const handleCheckin = () => {
-    // Dữ liệu input cứng cho hàm Check-in
     const checkinData = "0x5fdec8a2000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000002531302e3737383639323036363234353236352d3130362e3735313433313838333839383332000000000000000000000000000000000000000000000000000000"
     sendTx("Check-In", checkinData)
   }
 
   const handleCheckout = () => {
-    // Dữ liệu input cứng cho hàm Check-out
     const checkoutData = "0xdcdbf380000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000002531302e3737383639323036363234353236352d3130362e3735313433313838333839383332000000000000000000000000000000000000000000000000000000"
     sendTx("Check-Out", checkoutData)
   }
 
+  if (!isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+        <div className="text-center p-8 bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-sm animate-in fade-in zoom-in duration-300">
+          <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-extrabold text-slate-800 mb-6 tracking-tight">
+            Xác Thực Truy Cập
+          </h1>
+          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+            <input 
+              type="password" 
+              placeholder="Nhập mật khẩu..." 
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                setLoginError("")
+              }}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 text-slate-800 transition-all"
+              required
+            />
+            {loginError && <p className="text-sm text-rose-500 text-left">{loginError}</p>}
+            <button 
+              type="submit"
+              className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-200 active:scale-95"
+            >
+              Vào Ứng Dụng
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 relative">
+      <button 
+        onClick={handleLogout}
+        className="absolute top-4 right-4 p-2 bg-white rounded-xl shadow-sm text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors border border-slate-100"
+        title="Đăng xuất"
+      >
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+        </svg>
+      </button>
+
       <div className="text-center p-6 sm:p-8 bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-sm flex flex-col items-center">
         <h1 className="text-3xl font-extrabold text-slate-800 mb-6 tracking-tight">
           Auto Check-in
         </h1>
 
-        {/* Nút Check-In (Nằm trên) */}
+        {/* Nút Check-In */}
         <div className="py-4 mb-2">
           <button
             onClick={handleCheckin}
@@ -81,7 +159,7 @@ function App() {
           </p>
         </div>
 
-        {/* Nút Check-Out (Nằm dưới) */}
+        {/* Nút Check-Out */}
         <div className="py-4 mt-2">
           <button
             onClick={handleCheckout}
