@@ -13,8 +13,8 @@ export const customChain = defineChain({
     symbol: 'ETH',
   },
   rpcUrls: {
-    default: { http: ['https://rpc-proxy-sequoia.iqnb.com:8446'] },
-    public: { http: ['https://rpc-proxy-sequoia.iqnb.com:8446'] },
+    default: { http: ['https://61.28.238.209:8446'] },
+    public: { http: ['https://61.28.238.209:8446'] },
   },
 })
 

@@ -1,4 +1,4 @@
-export const PASSWORD_HASH = "f707fdda7c874ff49ebfb2c88a2860c5ff4ce3d94a21efb76566ad0f92c9ad57";
+export const PASSWORD_HASH = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
 
 export async function hashPassword(password) {
   const msgBuffer = new TextEncoder().encode(password);
