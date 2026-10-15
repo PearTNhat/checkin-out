@@ -2,7 +2,12 @@ import { createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { defineChain } from 'viem'
 
-// Khai báo cấu hình mạng lưới tùy chỉnh của bạn (Chain ID: 991, RPC: 139.59.243.85:8545)
+// Lấy RPC URL qua proxy API (/api/rpc) để tránh lỗi Mixed Content (HTTPS gọi HTTP) trên Vercel
+const rpcUrl = typeof window !== 'undefined'
+  ? `${window.location.origin}/api/rpc`
+  : 'http://localhost:5173/api/rpc'
+
+// Khai báo cấu hình mạng lưới tùy chỉnh của bạn (Chain ID: 991)
 export const customChain = defineChain({
   id: 991,
   name: 'Custom Network 991',
@@ -13,8 +18,8 @@ export const customChain = defineChain({
     symbol: 'ETH',
   },
   rpcUrls: {
-    default: { http: ['https://61.28.238.209:8446'] },
-    public: { http: ['https://61.28.238.209:8446'] },
+    default: { http: [rpcUrl] },
+    public: { http: [rpcUrl] },
   },
 })
 
@@ -25,9 +30,9 @@ const formattedPrivateKey = rawPrivateKey.startsWith("0x") ? rawPrivateKey : `0x
 // Khởi tạo Account từ Private Key
 export const account = privateKeyToAccount(formattedPrivateKey)
 
-// Tạo WalletClient với cấu hình mạng tùy chỉnh và HTTP RPC
+// Tạo WalletClient với cấu hình mạng tùy chỉnh và HTTP RPC qua proxy
 export const walletClient = createWalletClient({
   account,
   chain: customChain,
-  transport: http() // Không truyền gì vào thì nó sẽ tự lấy RPC từ customChain ở trên
+  transport: http(rpcUrl)
 })
