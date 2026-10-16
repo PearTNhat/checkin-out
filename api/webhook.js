@@ -104,12 +104,73 @@ export default async function handler(req, res) {
     console.error(error);
     const chatId = req.body?.callback_query?.message?.chat?.id || req.body?.message?.chat?.id;
     if (chatId) {
-       await fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage`, {
+      const errorMsg = extractErrorMessage(error);
+      await fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text: `❌ Lỗi: ${error.shortMessage || error.message}` })
+        body: JSON.stringify({ chat_id: chatId, text: `❌ Lỗi: ${errorMsg}` })
       });
     }
     return res.status(200).send('Error handled');
   }
+}
+
+function extractErrorMessage(err) {
+  if (!err) return 'Lỗi không xác định';
+  if (typeof err === 'string') {
+    try {
+      const parsed = JSON.parse(err);
+      if (parsed.error?.message) return parsed.error.message;
+      if (parsed.message) return parsed.message;
+    } catch {}
+    return err;
+  }
+  if (typeof err.walk === 'function') {
+    const detailError = err.walk((e) => Boolean(e?.details && typeof e.details === 'string'));
+    if (detailError?.details?.trim()) return detailError.details.trim();
+  }
+  if (err.details && typeof err.details === 'string' && err.details.trim()) {
+    return err.details.trim();
+  }
+  if (err.cause?.details && typeof err.cause.details === 'string' && err.cause.details.trim()) {
+    return err.cause.details.trim();
+  }
+  if (err.cause?.error?.message) return String(err.cause.error.message);
+  if (err.cause?.data?.message) return String(err.cause.data.message);
+  if (err.data?.message) return String(err.data.message);
+  if (err.error?.message) return String(err.error.message);
+  if (typeof err.message === 'string') {
+    try {
+      const parsed = JSON.parse(err.message);
+      if (parsed.error?.message) return parsed.error.message;
+      if (parsed.message) return parsed.message;
+    } catch {}
+    const detailsMatch = err.message.match(
+      /Details:\s*([\s\S]+?)(?:\r?\n\r?\n(?:URL|Version|Request|Raw):|\r?\n(?:URL|Version):|$)/i
+    );
+    if (detailsMatch && detailsMatch[1] && detailsMatch[1].trim()) {
+      return detailsMatch[1].trim();
+    }
+  }
+  const genericShortMessages = [
+    'An internal error was received',
+    'Missing or invalid parameters',
+    'Double check you have provided the correct parameters',
+    'An error occurred while executing the transaction',
+    'Transaction execution error',
+  ];
+  if (
+    err.shortMessage &&
+    !genericShortMessages.some((m) => err.shortMessage.toLowerCase().includes(m.toLowerCase()))
+  ) {
+    return err.shortMessage;
+  }
+  if (
+    err.cause?.message &&
+    typeof err.cause.message === 'string' &&
+    !genericShortMessages.some((m) => err.cause.message.toLowerCase().includes(m.toLowerCase()))
+  ) {
+    return err.cause.message;
+  }
+  return err.details || err.shortMessage || err.message || String(err);
 }

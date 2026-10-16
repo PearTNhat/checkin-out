@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   account as initialAccount,
   walletClient as initialWalletClient,
@@ -27,6 +27,9 @@ import {
   fetchInformation,
   fetchShiftConfig,
   fetchRoles,
+  fetchMonthlySummary,
+  fetchOfficeConfig,
+  extractErrorMessage,
 } from './contractService'
 
 function App() {
@@ -55,6 +58,9 @@ function App() {
   // Dữ liệu hồ sơ người dùng & Cấu hình ca
   const [profile, setProfile] = useState(null)
   const [shiftConfig, setShiftConfig] = useState(null)
+  const [officeConfig, setOfficeConfig] = useState(null)
+  const [monthlySummary, setMonthlySummary] = useState(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
   const [roles, setRoles] = useState([])
   const [rolesLoading, setRolesLoading] = useState(false)
 
@@ -91,6 +97,9 @@ function App() {
   const [employees, setEmployees] = useState([])
   const [employeesLoading, setEmployeesLoading] = useState(false)
   const [employeeSearch, setEmployeeSearch] = useState('')
+
+  // Đánh dấu các tab đã tải dữ liệu thành công để tránh gọi lại dồn dập và tránh vòng lặp vô hạn
+  const loadedTabsRef = useRef(new Set())
 
   // Đồng hồ thời gian thực
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -131,10 +140,12 @@ function App() {
       setCurrentAccount(acc)
       setCurrentWalletClient(wc)
       setCurrentPublicClient(pc)
-      // Xóa cache để ví mới được load đúng dữ liệu của ví đó
+      // Xóa cache và cờ tab để ví mới được load đúng dữ liệu của ví đó
+      loadedTabsRef.current.clear()
       setProfile(null)
       setTodayAttendance(null)
       setHistoryList([])
+      setEmployees([])
     } catch (err) {
       console.error('Lỗi khởi tạo ví:', err)
     }
@@ -190,7 +201,31 @@ function App() {
     [currentPublicClient, currentAccount.address, fromDateStr, toDateStr]
   )
 
-  // Tải dữ liệu ban đầu: ƯU TIÊN DUY NHẤT TAB ĐIỂM DANH (Hồ sơ + Ca + Hôm nay)
+  // Tải dữ liệu thống kê tháng từ Smart Contract (0xd5a33901)
+  const loadMonthlySummary = useCallback(
+    async (y, m) => {
+      if (!isAuthenticated) return
+      const targetYear = y || checkinYear
+      const targetMonth = m || checkinMonth
+      setSummaryLoading(true)
+      try {
+        const summary = await fetchMonthlySummary(
+          currentPublicClient,
+          currentAccount.address,
+          targetYear,
+          targetMonth
+        )
+        if (summary) setMonthlySummary(summary)
+      } catch (err) {
+        console.warn(`Lỗi tải tóm tắt tháng ${targetMonth}/${targetYear}:`, err)
+      } finally {
+        setSummaryLoading(false)
+      }
+    },
+    [isAuthenticated, currentPublicClient, currentAccount.address, checkinYear, checkinMonth]
+  )
+
+  // Tải dữ liệu ban đầu: ƯU TIÊN DUY NHẤT TAB ĐIỂM DANH (Hồ sơ + Ca + Văn phòng + Thống kê + Hôm nay)
   // Không tải lịch sử 30 ngày hay danh bạ ngay lúc này để tránh làm chậm app
   const loadInitialData = useCallback(async () => {
     if (!isAuthenticated) return
@@ -210,12 +245,23 @@ function App() {
         })
         .catch((err) => console.warn('Lỗi tải cấu hình ca:', err))
 
-      // 3. Trạng thái chấm công hôm nay (quan trọng nhất cho nút Check-In/Check-Out)
+      // 3. Cấu hình vị trí văn phòng & GPS (getOfficeConfig - 0xe2acc1c5)
+      fetchOfficeConfig(currentPublicClient)
+        .then((office) => {
+          if (office) setOfficeConfig(office)
+        })
+        .catch((err) => console.warn('Lỗi tải cấu hình văn phòng:', err))
+
+      // 4. Thống kê tổng hợp tháng hiện tại (getMonthlySummary - 0xd5a33901)
+      const now = new Date()
+      loadMonthlySummary(now.getFullYear(), now.getMonth() + 1)
+
+      // 5. Trạng thái chấm công hôm nay (quan trọng nhất cho nút Check-In/Check-Out)
       await loadTodayStatus()
     } catch (err) {
       console.warn('Không thể tải một số thông tin ban đầu:', err)
     }
-  }, [isAuthenticated, currentPublicClient, currentAccount.address, loadTodayStatus])
+  }, [isAuthenticated, currentPublicClient, currentAccount.address, loadTodayStatus, loadMonthlySummary])
 
   useEffect(() => {
     loadInitialData()
@@ -314,10 +360,11 @@ function App() {
         hash,
       })
       await loadTodayStatus()
+      await loadMonthlySummary(checkinYear, checkinMonth)
       await loadAttendanceHistory()
     } catch (error) {
       console.error(error)
-      const errMsg = error.shortMessage || error.message || 'Lỗi không xác định'
+      const errMsg = extractErrorMessage(error)
       setStatus(`❌ Lỗi điểm danh: ${errMsg}`)
       setPopup({
         isOpen: true,
@@ -351,15 +398,17 @@ function App() {
         hash,
       })
       await loadTodayStatus()
+      await loadMonthlySummary(checkinYear, checkinMonth)
       await loadAttendanceHistory()
     } catch (error) {
       console.error(error)
-      setStatus(`❌ Lỗi: ${error.shortMessage || error.message}`)
+      const errorMsg = extractErrorMessage(error)
+      setStatus(`❌ Lỗi Quick Check-In: ${errorMsg}`)
       setPopup({
         isOpen: true,
         type: 'error',
         title: 'Lỗi Quick Check-In',
-        message: error.shortMessage || error.message,
+        message: errorMsg,
         hash: '',
       })
     } finally {
@@ -391,15 +440,17 @@ function App() {
         hash,
       })
       await loadTodayStatus()
+      await loadMonthlySummary(checkinYear, checkinMonth)
       await loadAttendanceHistory()
     } catch (error) {
       console.error(error)
-      setStatus(`❌ Lỗi: ${error.shortMessage || error.message}`)
+      const errorMsg = extractErrorMessage(error)
+      setStatus(`❌ Lỗi Quick Check-Out: ${errorMsg}`)
       setPopup({
         isOpen: true,
         type: 'error',
         title: 'Lỗi Quick Check-Out',
-        message: error.shortMessage || error.message,
+        message: errorMsg,
         hash: '',
       })
     } finally {
@@ -408,11 +459,11 @@ function App() {
   }
 
   // Tải danh sách toàn bộ nhân viên (getEmployees)
-  const handleLoadEmployees = async () => {
+  const handleLoadEmployees = useCallback(async () => {
     setEmployeesLoading(true)
     setStatus('⏳ Đang tải danh sách toàn bộ nhân viên từ Smart Contract...')
     try {
-      const list = await fetchEmployees(currentPublicClient)
+      const list = await fetchEmployees(currentPublicClient, currentAccount?.address)
       setEmployees(list)
       setStatus(`✅ Đã tải thành công ${list.length} nhân viên từ mạng lưới!`)
     } catch (err) {
@@ -421,25 +472,25 @@ function App() {
     } finally {
       setEmployeesLoading(false)
     }
-  }
+  }, [currentPublicClient, currentAccount?.address])
 
-  // Lazy loading: Chỉ gọi Smart Contract khi người dùng chủ động chuyển tab (tránh tải dồn dập gây chậm)
+  // Lazy loading: Chỉ gọi Smart Contract 1 lần khi người dùng chuyển tab (tránh tải dồn dập và tránh vòng lặp vô tận)
   useEffect(() => {
     if (!isAuthenticated) return
 
     if (activeTab === 'history') {
-      // Chỉ gọi khi sang tab lịch sử và chưa có dữ liệu
-      if (historyList.length === 0 && !historyLoading) {
+      if (!loadedTabsRef.current.has('history')) {
+        loadedTabsRef.current.add('history')
         loadAttendanceHistory(fromDateStr, toDateStr)
       }
     } else if (activeTab === 'employees') {
-      // Chỉ gọi khi sang tab danh bạ và chưa có dữ liệu
-      if (employees.length === 0 && !employeesLoading) {
+      if (!loadedTabsRef.current.has('employees')) {
+        loadedTabsRef.current.add('employees')
         handleLoadEmployees()
       }
     } else if (activeTab === 'shifts') {
-      // Chỉ gọi khi sang tab ca làm & quyền và chưa có vai trò
-      if (roles.length === 0 && !rolesLoading) {
+      if (!loadedTabsRef.current.has('shifts')) {
+        loadedTabsRef.current.add('shifts')
         setRolesLoading(true)
         fetchRoles(currentPublicClient)
           .then((r) => {
@@ -452,15 +503,10 @@ function App() {
   }, [
     activeTab,
     isAuthenticated,
-    historyList.length,
-    historyLoading,
-    employees.length,
-    employeesLoading,
-    roles.length,
-    rolesLoading,
     fromDateStr,
     toDateStr,
     loadAttendanceHistory,
+    handleLoadEmployees,
     currentPublicClient,
   ])
 
@@ -477,32 +523,31 @@ function App() {
   const dashboardStats = useMemo(() => {
     // 1. Số công chấm công (Timekeeping)
     const validDays = historyList.filter((item) => item.hasCheckedIn)
-    // Nếu có bản ghi trong tháng, tính công; nếu chưa có thì hiển thị mẫu như screenshot 12.5 công
-    const timekeeping = validDays.length > 0 ? (validDays.length * 1.0).toFixed(1) : '12.5'
+    const fallbackTimekeeping = validDays.length > 0 ? (validDays.length * 1.0).toFixed(1) : '12.5'
 
     // 2. Số lần đi trễ & Tổng thời gian đi trễ (Late: 13 Late - 6 Hours 23 Minutes)
-    let lateCount = 0
-    let totalLateSec = 0
+    let calcLateCount = 0
+    let calcLateSec = 0
     validDays.forEach((item) => {
       const inSec = item.checkInRec?.timeOfDay || 0
       if (inSec > 28800) {
         // Sau 08:00 AM
-        lateCount++
-        totalLateSec += inSec - 28800
+        calcLateCount++
+        calcLateSec += inSec - 28800
       }
     })
 
-    const lateCountDisplay = lateCount > 0 ? lateCount : 13
-    const lateHours = totalLateSec > 0 ? Math.floor(totalLateSec / 3600) : 6
-    const lateMins = totalLateSec > 0 ? Math.floor((totalLateSec % 3600) / 60) : 23
+    const fallbackLateCount = calcLateCount > 0 ? calcLateCount : 13
+    const fallbackLateHours = calcLateSec > 0 ? Math.floor(calcLateSec / 3600) : 6
+    const fallbackLateMins = calcLateSec > 0 ? Math.floor((calcLateSec % 3600) / 60) : 23
 
     // 3. Về sớm (Come back soon)
-    let earlyCount = 0
+    let calcEarlyCount = 0
     validDays.forEach((item) => {
       const outSec = item.checkOutRec?.timeOfDay || 0
       if (outSec > 0 && outSec < 63000) {
         // Trước 17:30 PM
-        earlyCount++
+        calcEarlyCount++
       }
     })
 
@@ -514,18 +559,18 @@ function App() {
 
     return {
       totalSalary: '0 VND',
-      timekeeping,
+      timekeeping: monthlySummary?.timekeeping ?? fallbackTimekeeping,
       timekeepingRemaining: '0 Day',
-      leavePermission: '0',
+      leavePermission: String(monthlySummary?.leavePermission ?? '0'),
       leaveRemaining: '0 Day',
-      lateCount: lateCountDisplay,
-      lateDuration: `${lateHours} Hours ${lateMins} Minutes`,
-      comeBackSoon: earlyCount,
-      comeBackSoonDuration: '0 Minute',
+      lateCount: monthlySummary?.lateCount ?? fallbackLateCount,
+      lateDuration: monthlySummary?.lateDuration ?? `${fallbackLateHours} Hours ${fallbackLateMins} Minutes`,
+      comeBackSoon: monthlySummary?.earlyCount ?? calcEarlyCount,
+      comeBackSoonDuration: monthlySummary?.earlyDuration ?? '0 Minute',
       overtime: '0 Minute',
       offWithoutPermission: `${offWithoutPermission} Days`,
     }
-  }, [historyList])
+  }, [historyList, monthlySummary])
 
   // Trạng thái ca làm việc hiện tại
   const currentShiftStatus = useMemo(() => {
@@ -786,7 +831,7 @@ function App() {
           {[
             { id: 'checkin', label: '📌 Điểm Danh' },
             { id: 'history', label: '📅 Lịch Sử Chấm Công' },
-            { id: 'employees', label: `👥 Danh Bạ (${employees.length || 68})` },
+            { id: 'employees', label: employees.length > 0 ? `👥 Danh Bạ (${employees.length})` : '👥 Danh Bạ' },
             { id: 'shifts', label: '⏱️ Ca Làm & Quyền' },
           ].map((tab) => (
             <button
@@ -808,14 +853,24 @@ function App() {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-5 flex-1 w-full space-y-5">
         {/* Dòng trạng thái chung */}
         {status && (
-          <div className="p-3.5 bg-indigo-50 border border-indigo-200 rounded-2xl text-xs font-medium text-indigo-900 flex items-center justify-between gap-2 shadow-xs">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="shrink-0 text-base">ℹ️</span>
-              <span className="truncate">{status}</span>
+          <div
+            className={`p-3.5 rounded-2xl text-xs font-medium flex items-start justify-between gap-2 shadow-xs border ${
+              status.startsWith('❌')
+                ? 'bg-rose-50 border-rose-200 text-rose-900'
+                : status.startsWith('✅')
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-indigo-50 border-indigo-200 text-indigo-900'
+            }`}
+          >
+            <div className="flex items-start gap-2 min-w-0 flex-1">
+              <span className="shrink-0 text-base">
+                {status.startsWith('❌') ? '⚠️' : status.startsWith('✅') ? '✅' : 'ℹ️'}
+              </span>
+              <span className="break-all whitespace-pre-line leading-relaxed">{status}</span>
             </div>
             <button
               onClick={() => setStatus('')}
-              className="text-xs text-indigo-700 hover:text-indigo-900 font-bold shrink-0 cursor-pointer"
+              className="text-xs opacity-70 hover:opacity-100 font-bold shrink-0 cursor-pointer px-1 py-0.5"
             >
               Đóng
             </button>
@@ -863,25 +918,51 @@ function App() {
                 </div>
               </div>
 
-              {/* Trạng thái ca làm việc */}
-              <div className="flex items-center gap-2.5 self-stretch sm:self-auto justify-between sm:justify-end bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200/80">
-                <div className="text-left">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
-                    Trạng thái ca
-                  </span>
-                  <span className="text-xs font-extrabold text-slate-800">{currentShiftStatus.text}</span>
+              {/* Vị trí chi nhánh văn phòng & Trạng thái ca làm việc */}
+              <div className="flex items-center gap-2.5 self-stretch sm:self-auto justify-between sm:justify-end flex-wrap sm:flex-nowrap">
+                {officeConfig && (
+                  <a
+                    href={officeConfig.mapsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 px-3 py-2 rounded-xl border border-slate-200/90 transition-colors shadow-2xs group"
+                    title={`Văn phòng: ${officeConfig.name}\nTọa độ: ${officeConfig.gps}\nBán kính cho phép: ${officeConfig.radius}m`}
+                  >
+                    <span className="text-sm group-hover:scale-110 transition-transform">📍</span>
+                    <div className="text-left">
+                      <div className="font-bold text-[11px] text-slate-800 leading-tight flex items-center gap-1">
+                        <span>{officeConfig.name}</span>
+                        <span className="text-[10px] text-emerald-600 font-extrabold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
+                          {officeConfig.radius}m
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono block">
+                        {officeConfig.gps}
+                      </span>
+                    </div>
+                  </a>
+                )}
+
+                {/* Trạng thái ca làm việc */}
+                <div className="flex items-center gap-2.5 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200/80">
+                  <div className="text-left">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
+                      Trạng thái ca
+                    </span>
+                    <span className="text-xs font-extrabold text-slate-800">{currentShiftStatus.text}</span>
+                  </div>
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      currentShiftStatus.color === 'emerald'
+                        ? 'bg-emerald-500 animate-pulse'
+                        : currentShiftStatus.color === 'amber'
+                        ? 'bg-amber-500 animate-pulse'
+                        : currentShiftStatus.color === 'teal'
+                        ? 'bg-blue-500 animate-pulse'
+                        : 'bg-slate-400'
+                    }`}
+                  ></span>
                 </div>
-                <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    currentShiftStatus.color === 'emerald'
-                      ? 'bg-emerald-500 animate-pulse'
-                      : currentShiftStatus.color === 'amber'
-                      ? 'bg-amber-500 animate-pulse'
-                      : currentShiftStatus.color === 'teal'
-                      ? 'bg-blue-500 animate-pulse'
-                      : 'bg-slate-400'
-                  }`}
-                ></span>
               </div>
             </div>
 
@@ -1728,7 +1809,7 @@ function App() {
       {/* 3. Popup Modal thông báo giao dịch */}
       {popup.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl max-w-sm w-full transform transition-all scale-100 text-center space-y-4">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl max-w-sm sm:max-w-md w-full transform transition-all scale-100 text-center space-y-4">
             <div
               className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center ${
                 popup.type === 'success' ? 'bg-emerald-50 border border-emerald-200 text-emerald-600' : 'bg-rose-50 border border-rose-200 text-rose-600'
@@ -1747,7 +1828,24 @@ function App() {
 
             <div>
               <h3 className="text-lg font-black text-slate-900">{popup.title}</h3>
-              <p className="text-xs text-slate-600 mt-1 whitespace-pre-line leading-relaxed">{popup.message}</p>
+              {popup.type === 'error' ? (
+                <div className="mt-3 text-left">
+                  <p className="text-[11px] font-bold text-rose-600 uppercase tracking-wider mb-1">
+                    Chi tiết lỗi từ mạng lưới:
+                  </p>
+                  <div className="p-3 bg-rose-50/80 border border-rose-200/80 rounded-xl text-xs font-mono text-rose-800 break-all select-all max-h-52 overflow-y-auto leading-relaxed whitespace-pre-line">
+                    {popup.message}
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(popup.message)}
+                    className="mt-2 text-xs font-semibold text-rose-700 hover:text-rose-800 hover:underline block cursor-pointer"
+                  >
+                    {copiedHash ? '✓ Đã sao chép lỗi' : 'Sao chép nội dung lỗi'}
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-600 mt-1 whitespace-pre-line leading-relaxed">{popup.message}</p>
+              )}
             </div>
 
             {popup.hash && (
