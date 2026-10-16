@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   }
 
   // Khi chạy remote (Vercel Serverless Function), gọi vào IP WAN để truy cập từ ngoài Internet
-  const TARGET_RPC_URL = process.env.REMOTE_RPC_URL || 'http://116.109.66.229:10746';
+  const TARGET_RPC_URL = process.env.REMOTE_RPC_URL || 'https://giant-legroom-predator.ngrok-free.dev';
 
   try {
     const payload = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
