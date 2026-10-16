@@ -57,6 +57,7 @@ function App() {
   const [profile, setProfile] = useState(null)
   const [shiftConfig, setShiftConfig] = useState(null)
   const [roles, setRoles] = useState([])
+  const [rolesLoading, setRolesLoading] = useState(false)
 
   // Chức năng Điểm danh (Smart Check-In)
   const [checkinYear, setCheckinYear] = useState(new Date().getFullYear())
@@ -128,6 +129,10 @@ function App() {
       setCurrentAccount(acc)
       setCurrentWalletClient(wc)
       setCurrentPublicClient(pc)
+      // Xóa cache để ví mới được load đúng dữ liệu của ví đó
+      setProfile(null)
+      setTodayAttendance(null)
+      setHistoryList([])
     } catch (err) {
       console.error('Lỗi khởi tạo ví:', err)
     }
@@ -183,32 +188,32 @@ function App() {
     [currentPublicClient, currentAccount.address, fromDateStr, toDateStr]
   )
 
-  // Tải dữ liệu ban đầu
+  // Tải dữ liệu ban đầu: ƯU TIÊN DUY NHẤT TAB ĐIỂM DANH (Hồ sơ + Ca + Hôm nay)
+  // Không tải lịch sử 30 ngày hay danh bạ ngay lúc này để tránh làm chậm app
   const loadInitialData = useCallback(async () => {
     if (!isAuthenticated) return
 
     try {
       // 1. Hồ sơ cá nhân (getInformation)
-      const info = await fetchInformation(currentPublicClient, currentAccount.address)
-      if (info) setProfile(info)
+      fetchInformation(currentPublicClient, currentAccount.address)
+        .then((info) => {
+          if (info) setProfile(info)
+        })
+        .catch((err) => console.warn('Lỗi tải thông tin hồ sơ:', err))
 
       // 2. Cấu hình ca (getShiftConfig)
-      const shifts = await fetchShiftConfig(currentPublicClient)
-      if (shifts) setShiftConfig(shifts)
+      fetchShiftConfig(currentPublicClient)
+        .then((shifts) => {
+          if (shifts) setShiftConfig(shifts)
+        })
+        .catch((err) => console.warn('Lỗi tải cấu hình ca:', err))
 
-      // 3. Danh sách roles (getRoles)
-      const r = await fetchRoles(currentPublicClient)
-      if (r) setRoles(r)
-
-      // 4. Trạng thái chấm công hôm nay
+      // 3. Trạng thái chấm công hôm nay (quan trọng nhất cho nút Check-In/Check-Out)
       await loadTodayStatus()
-
-      // 5. Tải sẵn lịch sử tháng hiện tại để tính toán các thẻ thống kê
-      await loadAttendanceHistory(defaultFromDateStr, defaultToDateStr)
     } catch (err) {
       console.warn('Không thể tải một số thông tin ban đầu:', err)
     }
-  }, [isAuthenticated, currentPublicClient, currentAccount.address, loadTodayStatus, loadAttendanceHistory, defaultFromDateStr, defaultToDateStr])
+  }, [isAuthenticated, currentPublicClient, currentAccount.address, loadTodayStatus])
 
   useEffect(() => {
     loadInitialData()
@@ -409,11 +414,46 @@ function App() {
     }
   }
 
+  // Lazy loading: Chỉ gọi Smart Contract khi người dùng chủ động chuyển tab (tránh tải dồn dập gây chậm)
   useEffect(() => {
-    if (activeTab === 'employees' && employees.length === 0 && !employeesLoading) {
-      handleLoadEmployees()
+    if (!isAuthenticated) return
+
+    if (activeTab === 'history') {
+      // Chỉ gọi khi sang tab lịch sử và chưa có dữ liệu
+      if (historyList.length === 0 && !historyLoading) {
+        loadAttendanceHistory(fromDateStr, toDateStr)
+      }
+    } else if (activeTab === 'employees') {
+      // Chỉ gọi khi sang tab danh bạ và chưa có dữ liệu
+      if (employees.length === 0 && !employeesLoading) {
+        handleLoadEmployees()
+      }
+    } else if (activeTab === 'shifts') {
+      // Chỉ gọi khi sang tab ca làm & quyền và chưa có vai trò
+      if (roles.length === 0 && !rolesLoading) {
+        setRolesLoading(true)
+        fetchRoles(currentPublicClient)
+          .then((r) => {
+            if (r) setRoles(r)
+          })
+          .catch((err) => console.warn('Lỗi tải roles:', err))
+          .finally(() => setRolesLoading(false))
+      }
     }
-  }, [activeTab, employees.length, employeesLoading])
+  }, [
+    activeTab,
+    isAuthenticated,
+    historyList.length,
+    historyLoading,
+    employees.length,
+    employeesLoading,
+    roles.length,
+    rolesLoading,
+    fromDateStr,
+    toDateStr,
+    loadAttendanceHistory,
+    currentPublicClient,
+  ])
 
   // Lọc danh sách nhân viên theo từ khóa tìm kiếm
   const filteredEmployees = useMemo(() => {
@@ -512,32 +552,32 @@ function App() {
   // MÀN HÌNH ĐĂNG NHẬP / CHỌN VÍ KẾT NỐI
   if (!isAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#090D16] p-4 text-left relative overflow-hidden font-sans">
-        {/* Background ambient lighting orbs */}
-        <div className="absolute top-1/4 left-1/3 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-600/15 rounded-full blur-[130px] pointer-events-none"></div>
-        <div className="absolute bottom-1/4 right-1/3 translate-x-1/2 translate-y-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-[130px] pointer-events-none"></div>
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-indigo-50/30 to-emerald-50/20 p-4 text-left relative overflow-hidden font-sans">
+        {/* Ambient background soft blurs */}
+        <div className="absolute top-1/4 left-1/3 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-200/30 rounded-full blur-[100px] pointer-events-none"></div>
+        <div className="absolute bottom-1/4 right-1/3 translate-x-1/2 translate-y-1/2 w-96 h-96 bg-emerald-200/25 rounded-full blur-[100px] pointer-events-none"></div>
 
-        <div className="bg-[#0F172A]/85 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/10 w-full max-w-md overflow-hidden relative z-10">
+        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-xl border border-slate-200/80 w-full max-w-md overflow-hidden relative z-10">
           {/* Header */}
-          <div className="p-6 text-center border-b border-white/[0.07] bg-gradient-to-b from-white/[0.03] to-transparent">
-            <div className="w-14 h-14 bg-gradient-to-tr from-indigo-500 via-blue-600 to-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-3.5 text-2xl shadow-lg shadow-indigo-500/25 text-white border border-white/10">
+          <div className="p-6 text-center border-b border-slate-100 bg-gradient-to-b from-indigo-50/40 to-transparent">
+            <div className="w-14 h-14 bg-gradient-to-tr from-indigo-600 via-blue-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-3.5 text-2xl shadow-md shadow-indigo-200 text-white">
               ⚡
             </div>
-            <h1 className="text-xl font-extrabold text-white tracking-tight">Hệ Thống Chấm Công Web3</h1>
-            <p className="text-xs text-slate-400 mt-1">Smart Contract Attendance Suite • Chain 991</p>
+            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Hệ Thống Chấm Công Web3</h1>
+            <p className="text-xs text-slate-500 mt-1">Smart Contract Attendance Suite • Chain 991</p>
           </div>
 
           {/* Tab chọn loại đăng nhập */}
-          <div className="grid grid-cols-2 p-1.5 mx-6 mt-6 bg-slate-950/70 rounded-2xl border border-white/[0.06]">
+          <div className="grid grid-cols-2 p-1.5 mx-6 mt-6 bg-slate-100 rounded-2xl border border-slate-200/80">
             <button
               onClick={() => {
                 setLoginMode('owner')
                 setLoginError('')
               }}
-              className={`py-2 text-xs font-bold rounded-xl transition-all ${
+              className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                 loginMode === 'owner'
-                  ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-md shadow-indigo-600/20'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/60'
+                  : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               👑 Ví Mặc Định (Chủ)
@@ -547,10 +587,10 @@ function App() {
                 setLoginMode('guest')
                 setLoginError('')
               }}
-              className={`py-2 text-xs font-bold rounded-xl transition-all ${
+              className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                 loginMode === 'guest'
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/20'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-white text-emerald-700 shadow-sm border border-slate-200/60'
+                  : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               🔑 Kết Nối Ví Khác
@@ -560,7 +600,7 @@ function App() {
           {/* Form đăng nhập */}
           <div className="p-6">
             {loginError && (
-              <div className="mb-4 p-3.5 bg-rose-500/10 border border-rose-500/25 text-rose-300 rounded-2xl text-xs font-medium flex items-center gap-2">
+              <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs font-medium flex items-center gap-2">
                 <span className="shrink-0 text-base">⚠️</span>
                 <span>{loginError}</span>
               </div>
@@ -569,16 +609,16 @@ function App() {
             {loginMode === 'owner' ? (
               /* TAB 1: VÍ MẶC ĐỊNH - CẦN MẬT KHẨU */
               <form onSubmit={handleOwnerLogin} className="space-y-4">
-                <div className="p-3.5 bg-slate-950/70 rounded-2xl border border-white/[0.06] space-y-1">
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
+                <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
                     <span>Tài khoản chủ sở hữu:</span>
-                    <span className="text-emerald-400 font-bold">Nhật Lê Tuấn</span>
+                    <span className="text-emerald-600 font-bold">Nhật Lê Tuấn</span>
                   </div>
-                  <div className="font-mono text-xs text-slate-300 break-all">{DEFAULT_ADDRESS}</div>
+                  <div className="font-mono text-xs text-slate-700 break-all">{DEFAULT_ADDRESS}</div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Mật Khẩu Quản Trị</label>
+                  <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Mật Khẩu Quản Trị</label>
                   <input
                     type="password"
                     placeholder="Nhập mật khẩu của bạn..."
@@ -587,7 +627,7 @@ function App() {
                       setPassword(e.target.value)
                       setLoginError('')
                     }}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-700/80 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 bg-slate-950/80 text-white text-sm"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 bg-white text-slate-900 text-sm"
                     autoFocus
                     required
                   />
@@ -595,7 +635,7 @@ function App() {
 
                 <button
                   type="submit"
-                  className="w-full py-3 bg-gradient-to-r from-indigo-500 via-blue-600 to-indigo-600 hover:from-indigo-400 hover:via-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/25 active:scale-[0.98] text-sm cursor-pointer"
+                  className="w-full py-3 bg-gradient-to-r from-indigo-600 via-blue-600 to-indigo-700 hover:from-indigo-700 hover:to-blue-700 text-white font-bold rounded-xl transition-all shadow-md shadow-indigo-200 active:scale-[0.98] text-sm cursor-pointer"
                 >
                   Xác Thực & Vào Ứng Dụng
                 </button>
@@ -603,24 +643,24 @@ function App() {
             ) : (
               /* TAB 2: VÍ KHÁCH / NHÂN VIÊN - CHỈ CẦN PRIVATE KEY */
               <form onSubmit={handleGuestLogin} className="space-y-4">
-                <p className="text-xs text-slate-400 leading-relaxed">
+                <p className="text-xs text-slate-600 leading-relaxed">
                   Nhập chuỗi <strong>Private Key</strong> của bạn để tham gia hệ thống và tự động tải hồ sơ cá nhân.
                   Không yêu cầu mật khẩu quản trị.
                 </p>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Tên Gợi Nhớ (Tùy chọn)</label>
+                  <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Tên Gợi Nhớ (Tùy chọn)</label>
                   <input
                     type="text"
                     placeholder="Ví dụ: Nguyễn Văn A..."
                     value={guestName}
                     onChange={(e) => setGuestName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-700/80 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/15 bg-slate-950/80 text-white text-sm"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100 bg-white text-slate-900 text-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-300 mb-1.5 block">
+                  <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
                     Private Key (Hex 64 ký tự)
                   </label>
                   <input
@@ -631,22 +671,22 @@ function App() {
                       setGuestKey(e.target.value)
                       setLoginError('')
                     }}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-700/80 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/15 bg-slate-950/80 text-white text-sm font-mono"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100 bg-white text-slate-900 text-sm font-mono"
                     required
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-3 bg-gradient-to-r from-emerald-500 via-teal-600 to-emerald-600 hover:from-emerald-400 hover:via-teal-500 hover:to-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/25 active:scale-[0.98] text-sm cursor-pointer"
+                  className="w-full py-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-xl transition-all shadow-md shadow-emerald-200 active:scale-[0.98] text-sm cursor-pointer"
                 >
                   Kết Nối Ví Của Tôi
                 </button>
 
                 {/* Danh sách ví phụ đã lưu để chọn nhanh */}
                 {savedWallets.filter((w) => !w.isDefault).length > 0 && (
-                  <div className="pt-2 border-t border-white/[0.06]">
-                    <span className="text-[11px] text-slate-400 font-semibold block mb-2">Hoặc chọn ví đã lưu:</span>
+                  <div className="pt-2 border-t border-slate-200">
+                    <span className="text-[11px] text-slate-500 font-semibold block mb-2">Hoặc chọn ví đã lưu:</span>
                     <div className="space-y-1.5 max-h-32 overflow-y-auto">
                       {savedWallets
                         .filter((w) => !w.isDefault)
@@ -658,10 +698,10 @@ function App() {
                               setGuestKey(w.privateKey)
                               setGuestName(w.name)
                             }}
-                            className="w-full text-left p-2.5 rounded-xl bg-slate-950/60 hover:bg-slate-900 border border-white/[0.06] hover:border-slate-700 text-xs flex items-center justify-between transition-colors"
+                            className="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs flex items-center justify-between transition-colors cursor-pointer"
                           >
-                            <span className="text-slate-200 font-bold truncate">{w.name}</span>
-                            <span className="text-[10px] font-mono text-slate-400">
+                            <span className="text-slate-800 font-bold truncate">{w.name}</span>
+                            <span className="text-[10px] font-mono text-slate-500">
                               {w.address.slice(0, 6)}...{w.address.slice(-4)}
                             </span>
                           </button>
@@ -678,28 +718,24 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#090D16] text-slate-100 flex flex-col font-sans relative selection:bg-indigo-500 selection:text-white">
-      {/* Background ambient lighting orbs for large screens */}
-      <div className="fixed top-0 left-1/4 w-[600px] h-[600px] bg-indigo-600/[0.04] rounded-full blur-[140px] pointer-events-none -z-10"></div>
-      <div className="fixed bottom-0 right-1/4 w-[600px] h-[600px] bg-emerald-500/[0.03] rounded-full blur-[140px] pointer-events-none -z-10"></div>
-
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans relative selection:bg-indigo-600 selection:text-white">
       {/* 1. Header Navigation Bar */}
-      <header className="sticky top-0 z-40 bg-[#090D16]/80 backdrop-blur-xl border-b border-white/[0.07] shadow-lg shadow-black/20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/90 shadow-xs">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           {/* Logo & Tên app */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-blue-600 to-emerald-400 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-indigo-500/20 border border-white/10">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-emerald-500 text-white flex items-center justify-center font-bold text-lg shadow-sm shadow-indigo-200">
               ⚡
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-sm sm:text-base font-extrabold text-white tracking-tight">Auto CheckIn-Out</h1>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 hidden sm:inline-flex items-center gap-1.5 font-mono">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                <h1 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight">Auto CheckIn-Out</h1>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 hidden sm:inline-flex items-center gap-1.5 font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
                   Chain 991
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium hidden sm:block">Smart Contract Attendance Suite</p>
+              <p className="text-[11px] text-slate-500 font-medium hidden sm:block">Smart Contract Attendance Suite</p>
             </div>
           </div>
 
@@ -708,12 +744,12 @@ function App() {
             {/* Pill ví cá nhân (Click để mở Wallet Manager Modal) */}
             <button
               onClick={() => setIsWalletModalOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-700/80 hover:border-slate-600 text-xs font-semibold text-slate-200 transition-all shadow-xs group"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition-all shadow-xs group cursor-pointer"
               title="Nhấn để đổi ví hoặc quản lý Private Key"
             >
-              <span className={`w-2 h-2 rounded-full ${isOwnerWallet ? 'bg-emerald-400' : 'bg-indigo-400'} shadow-xs`}></span>
-              <span className="font-mono text-slate-300">{`${currentAccount.address.slice(0, 6)}...${currentAccount.address.slice(-4)}`}</span>
-              <span className="text-[10px] px-1.5 py-0.5 bg-slate-800 text-slate-300 border border-slate-700/80 rounded font-bold group-hover:bg-slate-700 transition-colors">
+              <span className={`w-2 h-2 rounded-full ${isOwnerWallet ? 'bg-emerald-500' : 'bg-indigo-500'} shadow-xs`}></span>
+              <span className="font-mono text-slate-700 font-bold">{`${currentAccount.address.slice(0, 6)}...${currentAccount.address.slice(-4)}`}</span>
+              <span className="text-[10px] px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded font-bold group-hover:bg-slate-300 transition-colors">
                 Đổi ví
               </span>
             </button>
@@ -721,7 +757,7 @@ function App() {
             {/* Nút Đăng xuất */}
             <button
               onClick={handleLogout}
-              className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors border border-slate-800 hover:border-rose-500/30"
+              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors border border-slate-200 cursor-pointer"
               title="Đăng xuất"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -737,7 +773,7 @@ function App() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex space-x-1 sm:space-x-2 border-t border-white/[0.05] overflow-x-auto no-scrollbar">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 flex space-x-1 sm:space-x-2 border-t border-slate-100 overflow-x-auto no-scrollbar">
           {[
             { id: 'checkin', label: '📌 Điểm Danh' },
             { id: 'history', label: '📅 Lịch Sử Chấm Công' },
@@ -747,10 +783,10 @@ function App() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              className={`py-2.5 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
                 activeTab === tab.id
-                  ? 'border-indigo-500 text-white bg-white/[0.06] shadow-xs'
-                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'
+                  ? 'border-indigo-600 text-indigo-700 bg-indigo-50/70'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
               }`}
             >
               {tab.label}
@@ -760,314 +796,152 @@ function App() {
       </header>
 
       {/* 2. Main Content Body */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full space-y-6">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-5 flex-1 w-full space-y-5">
         {/* Dòng trạng thái chung */}
         {status && (
-          <div className="p-3.5 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-xs font-medium text-indigo-200 flex items-center justify-between gap-2 shadow-xs">
+          <div className="p-3.5 bg-indigo-50 border border-indigo-200 rounded-2xl text-xs font-medium text-indigo-900 flex items-center justify-between gap-2 shadow-xs">
             <div className="flex items-center gap-2 min-w-0">
               <span className="shrink-0 text-base">ℹ️</span>
               <span className="truncate">{status}</span>
             </div>
             <button
               onClick={() => setStatus('')}
-              className="text-xs text-indigo-400 hover:text-indigo-200 font-bold shrink-0"
+              className="text-xs text-indigo-700 hover:text-indigo-900 font-bold shrink-0 cursor-pointer"
             >
               Đóng
             </button>
           </div>
         )}
 
-        {/* ---------------- TAB 1: ĐIỂM DANH & DASHBOARD GIỐNG APP THỰC TẾ ---------------- */}
+        {/* ---------------- TAB 1: ĐIỂM DANH & DASHBOARD ---------------- */}
         {activeTab === 'checkin' && (
-          <div className="space-y-6 text-left">
-            {/* KHỐI TỔNG QUAN CHẤM CÔNG VỚI BẢNG MÀU ĐỒNG NHẤT SANG TRỌNG */}
-            <div className="bg-[#0D1527]/85 backdrop-blur-xl rounded-3xl p-5 sm:p-7 shadow-2xl border border-white/[0.08] space-y-5 relative overflow-hidden before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-indigo-500/40 before:to-transparent">
-              {/* Header Profile Banner */}
-              <div className="bg-gradient-to-r from-[#0F172A] via-[#121E36] to-[#0F172A] rounded-2xl p-5 sm:p-6 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-white/[0.08] shadow-lg relative overflow-hidden">
-                <div className="flex items-center gap-4">
-                  {/* Avatar Icon */}
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-500 via-blue-600 to-emerald-400 text-white flex items-center justify-center text-2xl font-black shadow-lg shadow-indigo-500/20 border border-white/10">
-                    {profile?.name ? profile.name.charAt(0) : 'N'}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                        v1.6.3
-                      </span>
-                      {isOwnerWallet ? (
-                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                          Chủ sở hữu
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                          Nhân viên
-                        </span>
-                      )}
-                    </div>
-                    <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+          <div className="space-y-5 text-left">
+            {/* 1. Header Profile Banner Gọn Gàng */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 text-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border border-slate-200/90 shadow-xs">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-emerald-500 text-white flex items-center justify-center text-xl font-black shadow-sm">
+                  {profile?.name ? profile.name.charAt(0) : 'N'}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-900">
                       {profile?.name || 'Nhật Lê Tuấn'}
                     </h2>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-slate-400 font-medium">
-                        {currentTime.toLocaleDateString('vi-VN', {
-                          weekday: 'long',
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        })}
+                    {isOwnerWallet ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Chủ sở hữu
                       </span>
-                      <span className="text-slate-600">•</span>
-                      <span className="font-mono text-xs text-indigo-300 font-bold bg-slate-950/70 border border-white/[0.06] px-2.5 py-0.5 rounded-lg">
-                        {currentTime.toLocaleTimeString('vi-VN')}
+                    ) : (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        Nhân viên
                       </span>
-                    </div>
+                    )}
                   </div>
-                </div>
-
-                {/* Trạng thái ca làm việc */}
-                <div className="flex items-center gap-3 self-stretch sm:self-auto justify-between sm:justify-end bg-slate-950/70 px-4 py-3 rounded-2xl border border-white/[0.07] shadow-inner">
-                  <div className="text-left">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
-                      Trạng thái ca
+                  <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                    <span>
+                      {currentTime.toLocaleDateString('vi-VN', {
+                        weekday: 'short',
+                        day: 'numeric',
+                        month: 'numeric',
+                        year: 'numeric',
+                      })}
                     </span>
-                    <span className="text-xs font-extrabold text-slate-100">{currentShiftStatus.text}</span>
-                  </div>
-                  <span
-                    className={`w-2.5 h-2.5 rounded-full ${
-                      currentShiftStatus.color === 'emerald'
-                        ? 'bg-emerald-400 animate-pulse'
-                        : currentShiftStatus.color === 'amber'
-                        ? 'bg-amber-400 animate-pulse'
-                        : currentShiftStatus.color === 'teal'
-                        ? 'bg-blue-400 animate-pulse'
-                        : 'bg-slate-500'
-                    }`}
-                  ></span>
-                </div>
-              </div>
-
-              {/* Card 1: 0 VND Total salary */}
-              <div className="bg-[#0F172A]/80 rounded-2xl p-4 sm:p-5 flex items-center justify-between border border-white/[0.07] shadow-md">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 flex items-center justify-center font-bold text-lg shadow-inner">
-                    💰
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                      Tổng Lương Tạm Tính (Total Salary)
-                    </span>
-                    <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono tracking-tight">
-                      {dashboardStats.totalSalary}
-                    </span>
-                  </div>
-                </div>
-                <span className="text-xs font-semibold px-3 py-1 bg-slate-800/80 text-slate-300 rounded-xl border border-slate-700/80">
-                  Kỳ Tháng {currentTime.getMonth() + 1}/{currentTime.getFullYear()}
-                </span>
-              </div>
-
-              {/* Grid 4 Thẻ Chỉ Số Đồng Nhất: Timekeeping, Leave, Late, Early Departure */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* 12.5 Timekeeping */}
-                <div className="bg-[#0F172A]/75 hover:bg-[#131E35] rounded-2xl p-5 border border-white/[0.07] hover:border-white/15 shadow-lg transition-all duration-300 flex flex-col justify-between min-h-[135px] group">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 flex items-center justify-center text-sm font-bold shadow-inner">
-                        📅
-                      </div>
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Công Điểm Danh</span>
-                    </div>
-                    <span className="text-[11px] text-emerald-400 font-semibold">Timekeeping</span>
-                  </div>
-
-                  <div className="my-2.5">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-3xl sm:text-4xl font-extrabold font-mono text-white tracking-tight">
-                        {dashboardStats.timekeeping}
-                      </span>
-                      <span className="text-xs font-bold text-emerald-400 uppercase">công</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-xs">
-                    <span className="text-slate-400 text-[11px]">Còn lại (Remaining):</span>
-                    <span className="font-bold text-emerald-300 bg-emerald-500/10 px-2.5 py-0.5 rounded-lg border border-emerald-500/20 text-[11px]">
-                      {dashboardStats.timekeepingRemaining}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 0 Leave permission */}
-                <div className="bg-[#0F172A]/75 hover:bg-[#131E35] rounded-2xl p-5 border border-white/[0.07] hover:border-white/15 shadow-lg transition-all duration-300 flex flex-col justify-between min-h-[135px] group">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-indigo-500/15 text-indigo-400 border border-indigo-500/25 flex items-center justify-center text-sm font-bold shadow-inner">
-                        🏖️
-                      </div>
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Nghỉ Có Phép</span>
-                    </div>
-                    <span className="text-[11px] text-indigo-400 font-semibold">Leave Permission</span>
-                  </div>
-
-                  <div className="my-2.5">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-3xl sm:text-4xl font-extrabold font-mono text-white tracking-tight">
-                        {dashboardStats.leavePermission}
-                      </span>
-                      <span className="text-xs font-bold text-indigo-400 uppercase">ngày</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-xs">
-                    <span className="text-slate-400 text-[11px]">Còn lại (Remaining):</span>
-                    <span className="font-bold text-indigo-300 bg-indigo-500/10 px-2.5 py-0.5 rounded-lg border border-indigo-500/20 text-[11px]">
-                      {dashboardStats.leaveRemaining}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 13 Late */}
-                <div className="bg-[#0F172A]/75 hover:bg-[#131E35] rounded-2xl p-5 border border-white/[0.07] hover:border-white/15 shadow-lg transition-all duration-300 flex flex-col justify-between min-h-[135px] group">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/25 flex items-center justify-center text-sm font-bold shadow-inner">
-                        ⏰
-                      </div>
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Số Lần Đi Trễ</span>
-                    </div>
-                    <span className="text-[11px] text-amber-400 font-semibold">Late</span>
-                  </div>
-
-                  <div className="my-2.5">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-3xl sm:text-4xl font-extrabold font-mono text-white tracking-tight">
-                        {dashboardStats.lateCount}
-                      </span>
-                      <span className="text-xs font-bold text-amber-400 uppercase">lần</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-xs">
-                    <span className="text-slate-400 text-[11px]">Tổng thời gian muộn:</span>
-                    <span className="font-bold text-amber-300 bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/20 text-[11px]">
-                      {dashboardStats.lateDuration}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 0 Come back soon */}
-                <div className="bg-[#0F172A]/75 hover:bg-[#131E35] rounded-2xl p-5 border border-white/[0.07] hover:border-white/15 shadow-lg transition-all duration-300 flex flex-col justify-between min-h-[135px] group">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-sky-500/15 text-sky-400 border border-sky-500/25 flex items-center justify-center text-sm font-bold shadow-inner">
-                        🏃
-                      </div>
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Số Lần Về Sớm</span>
-                    </div>
-                    <span className="text-[11px] text-sky-400 font-semibold">Come Back Soon</span>
-                  </div>
-
-                  <div className="my-2.5">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-3xl sm:text-4xl font-extrabold font-mono text-white tracking-tight">
-                        {dashboardStats.comeBackSoon}
-                      </span>
-                      <span className="text-xs font-bold text-sky-400 uppercase">lần</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-xs">
-                    <span className="text-slate-400 text-[11px]">Tổng thời gian sớm:</span>
-                    <span className="font-bold text-sky-300 bg-sky-500/10 px-2.5 py-0.5 rounded-lg border border-sky-500/20 text-[11px]">
-                      {dashboardStats.comeBackSoonDuration}
+                    <span>•</span>
+                    <span className="font-mono text-indigo-600 font-bold">
+                      {currentTime.toLocaleTimeString('vi-VN')}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Row 3: Overtime & Off without permission */}
-              <div className="bg-[#0F172A]/70 rounded-2xl p-4 sm:p-5 border border-white/[0.07] flex items-center justify-around text-center shadow-md">
-                <div className="flex-1">
-                  <div className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Tăng Ca (Overtime)</div>
-                  <div className="text-xl font-black font-mono text-sky-400 mt-0.5">{dashboardStats.overtime}</div>
+              {/* Trạng thái ca làm việc */}
+              <div className="flex items-center gap-2.5 self-stretch sm:self-auto justify-between sm:justify-end bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200/80">
+                <div className="text-left">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
+                    Trạng thái ca
+                  </span>
+                  <span className="text-xs font-extrabold text-slate-800">{currentShiftStatus.text}</span>
                 </div>
-                <div className="h-8 w-px bg-white/[0.08]"></div>
-                <div className="flex-1">
-                  <div className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
-                    Nghỉ Không Phép (Off)
-                  </div>
-                  <div className="text-xl font-black font-mono text-rose-400 mt-0.5">
-                    {dashboardStats.offWithoutPermission}
-                  </div>
-                </div>
+                <span
+                  className={`w-2.5 h-2.5 rounded-full ${
+                    currentShiftStatus.color === 'emerald'
+                      ? 'bg-emerald-500 animate-pulse'
+                      : currentShiftStatus.color === 'amber'
+                      ? 'bg-amber-500 animate-pulse'
+                      : currentShiftStatus.color === 'teal'
+                      ? 'bg-blue-500 animate-pulse'
+                      : 'bg-slate-400'
+                  }`}
+                ></span>
               </div>
             </div>
 
             {/* ============================================================== */}
-            {/* CÁC NÚT ĐIỂM DANH CHECK-IN / CHECK-OUT KÈM KHÓA THÔNG MINH */}
+            {/* 2. KHỐI THAO TÁC CHECK-IN / CHECK-OUT ĐẶT NGAY TRÊN ĐẦU */}
+            {/* THIẾT KẾ ĐẶC BIỆT CHO ĐIỆN THOẠI: VÀO APP LÀ ẤN ĐƯỢC NGAY! */}
             {/* ============================================================== */}
-            <div className="bg-[#0D1527]/85 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border border-white/[0.08] space-y-5">
+            <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/90 space-y-4">
               {/* Thông báo trạng thái hôm nay */}
               {isTodayCompleted ? (
-                <div className="p-4 bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 rounded-2xl flex items-center justify-between gap-3 shadow-sm">
+                <div className="p-3.5 sm:p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
                   <div className="flex items-center gap-3">
-                    <span className="text-3xl">🎉</span>
+                    <span className="text-2xl sm:text-3xl">🎉</span>
                     <div>
-                      <div className="text-sm font-bold text-white">Đã Hoàn Thành Chấm Công Hôm Nay!</div>
-                      <div className="text-xs text-emerald-400/90 mt-0.5">
-                        Vào ca: {todayAttendance.checkInRec?.formattedTime} | Tan ca:{' '}
-                        {todayAttendance.checkOutRec?.formattedTime}
+                      <div className="text-sm font-bold text-emerald-900">Đã Hoàn Thành Chấm Công Hôm Nay!</div>
+                      <div className="text-xs text-emerald-700 mt-0.5">
+                        Vào ca: <strong>{todayAttendance.checkInRec?.formattedTime}</strong> | Tan ca:{' '}
+                        <strong>{todayAttendance.checkOutRec?.formattedTime}</strong>
                       </div>
                     </div>
                   </div>
-                  <span className="text-xs font-bold px-3 py-1 bg-emerald-500 text-slate-950 rounded-full shrink-0 shadow-sm">
+                  <span className="text-[11px] font-bold px-3 py-1 bg-emerald-600 text-white rounded-full shrink-0 shadow-xs">
                     Hoàn tất cả ngày ✓
                   </span>
                 </div>
               ) : isTodayCheckedIn ? (
-                <div className="p-4 bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 rounded-2xl flex items-center justify-between gap-3 shadow-sm">
+                <div className="p-3.5 sm:p-4 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">⏱️</span>
+                    <span className="text-2xl sm:text-3xl">⏱️</span>
                     <div>
-                      <div className="text-sm font-bold text-white">
-                        Bạn đã Check-In vào ca lúc {todayAttendance.checkInRec?.formattedTime || todayAttendance.formattedTime}!
+                      <div className="text-sm font-bold text-indigo-900">
+                        Bạn đã Check-In vào ca lúc <strong>{todayAttendance.checkInRec?.formattedTime || todayAttendance.formattedTime}</strong>!
                       </div>
-                      <div className="text-xs text-indigo-300/80 mt-0.5">
-                        Nút Check-In đã được khóa. Hãy bấm <strong>Check-Out</strong> khi bạn tan ca.
+                      <div className="text-xs text-indigo-700 mt-0.5">
+                        Nút Check-In đã khóa. Hãy bấm <strong>Check-Out</strong> khi bạn tan ca.
                       </div>
                     </div>
                   </div>
-                  <span className="text-xs font-bold px-3 py-1 bg-indigo-500 text-white rounded-full shrink-0 shadow-sm">
+                  <span className="text-[11px] font-bold px-3 py-1 bg-indigo-600 text-white rounded-full shrink-0 shadow-xs">
                     Đang trong ca
                   </span>
                 </div>
               ) : (
-                <div className="p-4 bg-amber-500/10 border border-amber-500/25 text-amber-300 rounded-2xl flex items-center gap-3 shadow-sm">
-                  <span className="text-2xl">👋</span>
+                <div className="p-3.5 sm:p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl flex items-center gap-3 shadow-xs">
+                  <span className="text-2xl sm:text-3xl">👋</span>
                   <div>
-                    <div className="text-sm font-bold text-white">Chưa Điểm Danh Vào Ca Hôm Nay</div>
-                    <div className="text-xs text-amber-300/80 mt-0.5">
-                      Hãy bấm nút <strong>CHECK-IN</strong> bên dưới để bắt đầu ca làm việc.
+                    <div className="text-sm font-bold text-amber-900">Chưa Điểm Danh Vào Ca Hôm Nay</div>
+                    <div className="text-xs text-amber-700 mt-0.5">
+                      Bấm nút <strong>CHECK-IN</strong> màu xanh bên dưới để bắt đầu ca làm việc.
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* 2 Nút Check-in & Check-out lớn */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              {/* 2 NÚT THAO TÁC CHÍNH (LỚN, BẤM DỄ DÀNG TRÊN MÀN HÌNH ĐIỆN THOẠI) */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 {/* NÚT CHECK-IN */}
                 <button
                   onClick={handleLegacyCheckin}
                   disabled={isSubmitting || !canCheckIn}
-                  className={`flex flex-col items-center justify-center p-6 rounded-2xl font-black text-xl transition-all duration-300 shadow-xl ${
+                  className={`flex flex-col items-center justify-center p-5 sm:p-6 rounded-2xl font-black transition-all duration-200 shadow-md ${
                     canCheckIn
-                      ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-400 text-white shadow-emerald-500/20 border border-emerald-400/30 hover:scale-[1.01] active:scale-[0.98] cursor-pointer'
-                      : 'bg-slate-900/60 text-slate-500 cursor-not-allowed border border-white/[0.05] shadow-none'
+                      ? 'bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-emerald-500/25 active:scale-[0.98] cursor-pointer'
+                      : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none'
                   }`}
                 >
-                  <span className="text-3xl mb-1">{canCheckIn ? '🟢' : '🔒'}</span>
-                  <span>CHECK-IN</span>
-                  <span className="text-xs font-normal mt-1 opacity-80">
+                  <span className="text-2xl sm:text-3xl mb-1">{canCheckIn ? '🟢' : '🔒'}</span>
+                  <span className="text-lg sm:text-xl tracking-tight">CHECK-IN</span>
+                  <span className="text-[11px] font-normal mt-0.5 opacity-90">
                     {isTodayCheckedIn ? 'Đã vào ca' : 'Điểm danh vào ca'}
                   </span>
                 </button>
@@ -1076,17 +950,17 @@ function App() {
                 <button
                   onClick={handleLegacyCheckout}
                   disabled={isSubmitting || !canCheckOut}
-                  className={`flex flex-col items-center justify-center p-6 rounded-2xl font-black text-xl transition-all duration-300 shadow-xl ${
+                  className={`flex flex-col items-center justify-center p-5 sm:p-6 rounded-2xl font-black transition-all duration-200 shadow-md ${
                     canCheckOut
-                      ? 'bg-gradient-to-r from-amber-500 via-rose-500 to-red-600 hover:from-amber-400 hover:via-rose-400 hover:to-red-500 text-white shadow-rose-500/25 border border-rose-400/30 hover:scale-[1.01] active:scale-[0.98] cursor-pointer'
-                      : 'bg-slate-900/60 text-slate-500 cursor-not-allowed border border-white/[0.05] shadow-none'
+                      ? 'bg-gradient-to-r from-rose-500 via-rose-600 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white shadow-rose-500/25 active:scale-[0.98] cursor-pointer'
+                      : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none'
                   }`}
                 >
-                  <span className="text-3xl mb-1">{canCheckOut ? '🔴' : isTodayCompleted ? '🎉' : '🔒'}</span>
-                  <span>CHECK-OUT</span>
-                  <span className="text-xs font-normal mt-1 opacity-80">
+                  <span className="text-2xl sm:text-3xl mb-1">{canCheckOut ? '🔴' : isTodayCompleted ? '🎉' : '🔒'}</span>
+                  <span className="text-lg sm:text-xl tracking-tight">CHECK-OUT</span>
+                  <span className="text-[11px] font-normal mt-0.5 opacity-90">
                     {isTodayCompleted
-                      ? 'Đã hoàn thành cả ngày'
+                      ? 'Đã hoàn tất ngày'
                       : !isTodayCheckedIn
                       ? 'Cần Check-In trước'
                       : 'Điểm danh tan ca'}
@@ -1094,15 +968,13 @@ function App() {
                 </button>
               </div>
 
-              {/* Form Check-In Smart Contract (checkIn(year, month) - 0xd5a33901) */}
-              <div className="pt-4 border-t border-white/[0.06]">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    ✍️ Smart Contract Signature (0xd5a33901)
-                  </span>
-                </div>
-
-                <form onSubmit={handleSmartCheckIn} className="flex flex-col sm:flex-row gap-3">
+              {/* Form Check-In Smart Contract (checkIn(year, month) - 0xd5a33901) - Gọn gàng */}
+              <details className="pt-2 text-xs text-slate-500 border-t border-slate-100 group">
+                <summary className="font-semibold text-slate-600 cursor-pointer hover:text-indigo-600 py-1 flex items-center justify-between">
+                  <span>✍️ Ký Smart Contract Trực Tiếp (0xd5a33901)</span>
+                  <span className="text-[11px] text-indigo-600 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <form onSubmit={handleSmartCheckIn} className="flex flex-col sm:flex-row gap-2.5 pt-3">
                   <div className="flex gap-2 flex-1">
                     <input
                       type="number"
@@ -1110,7 +982,7 @@ function App() {
                       max="2035"
                       value={checkinYear}
                       onChange={(e) => setCheckinYear(parseInt(e.target.value, 10))}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700/80 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 bg-slate-950/70 text-slate-200"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:border-indigo-600 bg-white text-slate-800"
                       disabled={!canCheckIn}
                       title="Năm"
                     />
@@ -1120,7 +992,7 @@ function App() {
                       max="12"
                       value={checkinMonth}
                       onChange={(e) => setCheckinMonth(parseInt(e.target.value, 10))}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700/80 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 bg-slate-950/70 text-slate-200"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:border-indigo-600 bg-white text-slate-800"
                       disabled={!canCheckIn}
                       title="Tháng"
                     />
@@ -1129,10 +1001,10 @@ function App() {
                   <button
                     type="submit"
                     disabled={isSubmitting || !canCheckIn}
-                    className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+                    className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
                       canCheckIn
-                        ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 active:scale-95 cursor-pointer'
-                        : 'bg-slate-900/60 text-slate-500 cursor-not-allowed border border-white/[0.05]'
+                        ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs cursor-pointer'
+                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                     }`}
                   >
                     {isSubmitting ? (
@@ -1142,6 +1014,163 @@ function App() {
                     )}
                   </button>
                 </form>
+              </details>
+            </div>
+
+            {/* ============================================================== */}
+            {/* 3. KHỐI TỔNG QUAN DỮ LIỆU CHẤM CÔNG (BẢNG MÀU SÁNG, TINH TẾ) */}
+            {/* ============================================================== */}
+            <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/90 space-y-4">
+              {/* Card 1: 0 VND Total salary */}
+              <div className="bg-slate-50/80 rounded-2xl p-4 sm:p-5 flex items-center justify-between border border-slate-200 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center font-bold text-lg shadow-xs">
+                    💰
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                      Tổng Lương Tạm Tính (Total Salary)
+                    </span>
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 font-mono tracking-tight">
+                      {dashboardStats.totalSalary}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-xs font-semibold px-3 py-1 bg-white text-slate-700 rounded-xl border border-slate-200 shadow-xs">
+                  Tháng {currentTime.getMonth() + 1}/{currentTime.getFullYear()}
+                </span>
+              </div>
+
+              {/* Grid 4 Thẻ Chỉ Số: Timekeeping, Leave, Late, Early Departure */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                {/* 12.5 Timekeeping */}
+                <div className="bg-slate-50/60 hover:bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs transition-all flex flex-col justify-between min-h-[125px]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center text-xs sm:text-sm font-bold">
+                        📅
+                      </div>
+                      <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700">Công Điểm Danh</span>
+                    </div>
+                  </div>
+
+                  <div className="my-2">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 tracking-tight">
+                        {dashboardStats.timekeeping}
+                      </span>
+                      <span className="text-xs font-bold text-emerald-600 uppercase">công</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/70 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Còn lại:</span>
+                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      {dashboardStats.timekeepingRemaining}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 0 Leave permission */}
+                <div className="bg-slate-50/60 hover:bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs transition-all flex flex-col justify-between min-h-[125px]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center text-xs sm:text-sm font-bold">
+                        🏖️
+                      </div>
+                      <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700">Nghỉ Có Phép</span>
+                    </div>
+                  </div>
+
+                  <div className="my-2">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 tracking-tight">
+                        {dashboardStats.leavePermission}
+                      </span>
+                      <span className="text-xs font-bold text-indigo-600 uppercase">ngày</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/70 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Còn lại:</span>
+                    <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                      {dashboardStats.leaveRemaining}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 13 Late */}
+                <div className="bg-slate-50/60 hover:bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs transition-all flex flex-col justify-between min-h-[125px]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-xs sm:text-sm font-bold">
+                        ⏰
+                      </div>
+                      <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700">Số Lần Đi Trễ</span>
+                    </div>
+                  </div>
+
+                  <div className="my-2">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 tracking-tight">
+                        {dashboardStats.lateCount}
+                      </span>
+                      <span className="text-xs font-bold text-amber-600 uppercase">lần</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/70 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500 truncate mr-1">Tổng muộn:</span>
+                    <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 shrink-0">
+                      {dashboardStats.lateDuration}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 0 Come back soon */}
+                <div className="bg-slate-50/60 hover:bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs transition-all flex flex-col justify-between min-h-[125px]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-sky-50 text-sky-600 border border-sky-200 flex items-center justify-center text-xs sm:text-sm font-bold">
+                        🏃
+                      </div>
+                      <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700">Số Lần Về Sớm</span>
+                    </div>
+                  </div>
+
+                  <div className="my-2">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 tracking-tight">
+                        {dashboardStats.comeBackSoon}
+                      </span>
+                      <span className="text-xs font-bold text-sky-600 uppercase">lần</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/70 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500 truncate mr-1">Tổng sớm:</span>
+                    <span className="font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200 shrink-0">
+                      {dashboardStats.comeBackSoonDuration}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 3: Overtime & Off without permission */}
+              <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200 flex items-center justify-around text-center shadow-xs">
+                <div className="flex-1">
+                  <div className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Tăng Ca (Overtime)</div>
+                  <div className="text-lg sm:text-xl font-black font-mono text-sky-600 mt-0.5">{dashboardStats.overtime}</div>
+                </div>
+                <div className="h-8 w-px bg-slate-200"></div>
+                <div className="flex-1">
+                  <div className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">
+                    Nghỉ Không Phép (Off)
+                  </div>
+                  <div className="text-lg sm:text-xl font-black font-mono text-rose-600 mt-0.5">
+                    {dashboardStats.offWithoutPermission}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1149,14 +1178,14 @@ function App() {
 
         {/* ---------------- TAB 2: LỊCH SỬ CHẤM CÔNG (RANGE KHOẢNG NGÀY & THÁNG) ---------------- */}
         {activeTab === 'history' && (
-          <div className="space-y-6 text-left">
+          <div className="space-y-5 text-left">
             {/* Bộ lọc khoảng ngày */}
-            <div className="bg-[#0D1527]/85 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border border-white/[0.08] space-y-4">
+            <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/90 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-base font-bold text-white">Lịch Sử Điểm Danh</h3>
-                  <p className="text-xs text-slate-400">
-                    Mặc định xuất toàn bộ các ngày từ đầu tháng đến nay bằng hàm <code>getAttendanceByDate</code>
+                  <h3 className="text-base font-bold text-slate-900">Lịch Sử Điểm Danh</h3>
+                  <p className="text-xs text-slate-500">
+                    Xuất toàn bộ các ngày từ đầu tháng đến nay bằng hàm <code>getAttendanceByDate</code>
                   </p>
                 </div>
 
@@ -1168,7 +1197,7 @@ function App() {
                       setToDateStr(defaultToDateStr)
                       loadAttendanceHistory(defaultFromDateStr, defaultToDateStr)
                     }}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 transition-colors"
+                    className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors cursor-pointer"
                   >
                     Tháng Này
                   </button>
@@ -1180,7 +1209,7 @@ function App() {
                       setToDateStr(s)
                       loadAttendanceHistory(s, s)
                     }}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                    className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
                   >
                     Hôm Nay
                   </button>
@@ -1190,7 +1219,7 @@ function App() {
                       setToDateStr('2026-10-16')
                       loadAttendanceHistory('2026-10-01', '2026-10-16')
                     }}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition-colors"
+                    className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors cursor-pointer"
                     title="Dải ngày mẫu có dữ liệu thực tế"
                   >
                     01/10 - 16/10/2026
@@ -1199,30 +1228,30 @@ function App() {
               </div>
 
               {/* Form chọn từ ngày - đến ngày */}
-              <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 pt-1">
                 <div className="sm:col-span-2">
-                  <label className="text-[11px] font-semibold text-slate-400 mb-1 block">Từ Ngày</label>
+                  <label className="text-[11px] font-semibold text-slate-600 mb-1 block">Từ Ngày</label>
                   <input
                     type="date"
                     value={fromDateStr}
                     onChange={(e) => setFromDateStr(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700/80 text-sm font-semibold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 bg-slate-950/80 text-slate-200"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 bg-white text-slate-800"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-[11px] font-semibold text-slate-400 mb-1 block">Đến Ngày</label>
+                  <label className="text-[11px] font-semibold text-slate-600 mb-1 block">Đến Ngày</label>
                   <input
                     type="date"
                     value={toDateStr}
                     onChange={(e) => setToDateStr(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700/80 text-sm font-semibold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 bg-slate-950/80 text-slate-200"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 bg-white text-slate-800"
                   />
                 </div>
                 <div className="sm:col-span-1 flex items-end">
                   <button
                     onClick={() => loadAttendanceHistory()}
                     disabled={historyLoading}
-                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-md shadow-indigo-600/20 text-xs active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-xs text-xs active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     {historyLoading ? (
                       <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
@@ -1234,151 +1263,247 @@ function App() {
               </div>
             </div>
 
-            {/* Thống kê nhanh trong khoảng ngày */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="p-4 bg-[#0F172A]/80 rounded-2xl border border-white/[0.07] shadow-sm">
-                <span className="text-xs text-slate-400 block mb-1">Số Ngày Tra Cứu</span>
-                <span className="text-2xl font-black text-white">{historyList.length}</span>
-                <span className="text-xs text-slate-400 ml-1">ngày</span>
+            {/* Thống kê nhanh trong khoảng ngày - Hiển thị gọn gàng trên mobile */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-4">
+              <div className="p-3 sm:p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
+                <span className="text-[10px] sm:text-xs text-slate-500 block mb-0.5 truncate">Số Ngày</span>
+                <span className="text-lg sm:text-2xl font-black text-slate-900">{historyList.length}</span>
+                <span className="text-[10px] sm:text-xs text-slate-500 ml-1 hidden sm:inline">ngày</span>
               </div>
-              <div className="p-4 bg-[#0F172A]/80 rounded-2xl border border-white/[0.07] shadow-sm">
-                <span className="text-xs text-slate-400 block mb-1">Đã Check-In Vào Ca</span>
-                <span className="text-2xl font-black text-emerald-400">
+              <div className="p-3 sm:p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
+                <span className="text-[10px] sm:text-xs text-slate-500 block mb-0.5 truncate">Check-In</span>
+                <span className="text-lg sm:text-2xl font-black text-emerald-600">
                   {historyList.filter((i) => i.hasCheckedIn).length}
                 </span>
-                <span className="text-xs text-slate-400 ml-1">/{historyList.length} ngày</span>
+                <span className="text-[10px] sm:text-xs text-slate-500 ml-1">/{historyList.length}</span>
               </div>
-              <div className="p-4 bg-[#0F172A]/80 rounded-2xl border border-white/[0.07] shadow-sm">
-                <span className="text-xs text-slate-400 block mb-1">Hoàn Thành Cả Ca (In + Out)</span>
-                <span className="text-2xl font-black text-indigo-400">
+              <div className="p-3 sm:p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
+                <span className="text-[10px] sm:text-xs text-slate-500 block mb-0.5 truncate">Đủ Ca</span>
+                <span className="text-lg sm:text-2xl font-black text-indigo-600">
                   {historyList.filter((i) => i.isCompleted).length}
                 </span>
-                <span className="text-xs text-slate-400 ml-1">ngày</span>
+                <span className="text-[10px] sm:text-xs text-slate-500 ml-1 hidden sm:inline">ngày</span>
               </div>
             </div>
 
             {/* Danh sách kết quả từng ngày */}
-            <div className="bg-[#0D1527]/85 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border border-white/[0.08] space-y-4">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Bảng Chi Tiết Điểm Danh Hàng Ngày ({historyList.length})
-              </h4>
+            <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                  Bảng Chi Tiết Điểm Danh Hàng Ngày ({historyList.length})
+                </h4>
+                {historyList.length > 0 && (
+                  <button
+                    onClick={() => loadAttendanceHistory()}
+                    disabled={historyLoading}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>🔄</span>
+                    <span className="hidden sm:inline">Làm mới</span>
+                  </button>
+                )}
+              </div>
 
               {historyLoading ? (
-                <div className="p-12 text-center text-slate-400">
-                  <span className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin inline-block mb-3"></span>
+                <div className="p-12 text-center text-slate-500">
+                  <span className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin inline-block mb-3"></span>
                   <p className="text-xs font-semibold">Đang truy vấn lịch sử từng ngày từ Smart Contract...</p>
                 </div>
+              ) : historyList.length === 0 ? (
+                <div className="py-10 text-center text-slate-500 text-xs">
+                  Chưa có dữ liệu nào trong khoảng ngày đã chọn hoặc chưa bấm Tra Cứu.
+                </div>
               ) : (
-                <div className="overflow-x-auto rounded-2xl border border-white/[0.07] bg-slate-950/40">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-950/80 border-b border-white/[0.07] text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                        <th className="py-3.5 px-4">Ngày</th>
-                        <th className="py-3.5 px-4">Giờ Vào (Check-In)</th>
-                        <th className="py-3.5 px-4">Giờ Ra (Check-Out)</th>
-                        <th className="py-3.5 px-4">Thời Lượng</th>
-                        <th className="py-3.5 px-4">Trạng Thái</th>
-                        <th className="py-3.5 px-4 text-right">Vị Trí GPS</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/[0.05] text-xs">
-                      {historyList.map((item) => {
-                        return (
-                          <tr
-                            key={item.date}
-                            className={`transition-colors ${
-                              item.isCompleted
-                                ? 'bg-emerald-500/[0.04]'
+                <>
+                  {/* GIAO DIỆN DI ĐỘNG (Mobile Card View): Không co cụm, không vỡ chữ, không cần cuộn ngang, BỎ MAP */}
+                  <div className="block md:hidden space-y-3">
+                    {historyList.map((item) => (
+                      <div
+                        key={item.date}
+                        className={`p-3.5 sm:p-4 rounded-2xl border transition-all shadow-xs ${
+                          item.isCompleted
+                            ? 'bg-emerald-50/30 border-emerald-200'
+                            : item.hasCheckedIn
+                            ? 'bg-indigo-50/30 border-indigo-200'
+                            : 'bg-white border-slate-200'
+                        }`}
+                      >
+                        {/* Hàng trên: Ngày tháng + Thứ & Trạng thái */}
+                        <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+                          <div>
+                            <div className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+                              <span>📅</span>
+                              <span>{item.formattedDate}</span>
+                            </div>
+                            <div className="text-[11px] font-semibold text-slate-500 mt-0.5">{item.dayOfWeek}</div>
+                          </div>
+                          <div className="shrink-0">
+                            {item.isCompleted ? (
+                              <span className="whitespace-nowrap px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1">
+                                <span>✓</span> Hoàn Thành
+                              </span>
+                            ) : item.hasCheckedIn ? (
+                              <span className="whitespace-nowrap px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-indigo-100 text-indigo-800 border border-indigo-200 inline-flex items-center gap-1">
+                                <span>⏱️</span> Đang Làm
+                              </span>
+                            ) : (
+                              <span className="whitespace-nowrap px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                                Chưa Chấm Công
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Hàng dưới: 3 cột thông số gọn gàng (Giờ Vào, Giờ Ra, Thời Lượng) */}
+                        <div className="grid grid-cols-3 gap-2 pt-2.5 text-center">
+                          {/* Giờ vào */}
+                          <div className="bg-emerald-50/80 border border-emerald-100 rounded-xl p-2">
+                            <span className="text-[10px] font-bold text-emerald-700 block uppercase tracking-wider">
+                              Vào Ca
+                            </span>
+                            <span className="font-mono text-xs font-bold text-emerald-900 block mt-0.5 whitespace-nowrap">
+                              {item.checkInRec ? `🟢 ${item.checkInRec.formattedTime}` : '--:--'}
+                            </span>
+                          </div>
+
+                          {/* Giờ ra */}
+                          <div
+                            className={`rounded-xl p-2 border ${
+                              item.checkOutRec
+                                ? 'bg-rose-50/80 border-rose-100'
                                 : item.hasCheckedIn
-                                ? 'bg-indigo-500/[0.04]'
-                                : 'hover:bg-white/[0.02]'
+                                ? 'bg-amber-50/80 border-amber-200'
+                                : 'bg-slate-50 border-slate-200'
                             }`}
                           >
-                            <td className="py-3 px-4">
-                              <div className="font-bold text-white">{item.formattedDate}</div>
-                              <div className="text-[10px] text-slate-400">{item.dayOfWeek}</div>
-                            </td>
+                            <span
+                              className={`text-[10px] font-bold block uppercase tracking-wider ${
+                                item.checkOutRec
+                                  ? 'text-rose-700'
+                                  : item.hasCheckedIn
+                                  ? 'text-amber-800'
+                                  : 'text-slate-500'
+                              }`}
+                            >
+                              Tan Ca
+                            </span>
+                            <span
+                              className={`font-mono text-xs font-bold block mt-0.5 whitespace-nowrap ${
+                                item.checkOutRec
+                                  ? `🔴 ${item.checkOutRec.formattedTime}`
+                                  : item.hasCheckedIn
+                                  ? 'Chưa Ra'
+                                  : '--:--'
+                              }`}
+                            >
+                              {item.checkOutRec
+                                ? item.checkOutRec.formattedTime
+                                : item.hasCheckedIn
+                                ? 'Chưa Ra'
+                                : '--:--'}
+                            </span>
+                          </div>
 
-                            {/* Giờ Check-In */}
-                            <td className="py-3 px-4 font-mono font-bold">
-                              {item.checkInRec ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                                  <span>🟢</span>
-                                  <span>{item.checkInRec.formattedTime}</span>
-                                </span>
-                              ) : (
-                                <span className="text-slate-600">--:--</span>
-                              )}
-                            </td>
+                          {/* Thời lượng */}
+                          <div className="bg-indigo-50/70 border border-indigo-100 rounded-xl p-2">
+                            <span className="text-[10px] font-bold text-indigo-700 block uppercase tracking-wider">
+                              Thời Lượng
+                            </span>
+                            <span className="text-xs font-bold text-indigo-950 block mt-0.5 truncate whitespace-nowrap">
+                              {item.totalWorkTimeStr || (item.hasCheckedIn ? 'Đang làm' : '--')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
-                            {/* Giờ Check-Out */}
-                            <td className="py-3 px-4 font-mono font-bold">
-                              {item.checkOutRec ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20">
-                                  <span>🔴</span>
-                                  <span>{item.checkOutRec.formattedTime}</span>
-                                </span>
-                              ) : item.hasCheckedIn ? (
-                                <span className="text-[11px] font-semibold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
-                                  Chưa Check-Out
-                                </span>
-                              ) : (
-                                <span className="text-slate-600">--:--</span>
-                              )}
-                            </td>
-
-                            {/* Thời lượng làm việc */}
-                            <td className="py-3 px-4 font-medium text-slate-300">
-                              {item.totalWorkTimeStr || (item.hasCheckedIn && !item.hasCheckedOut ? 'Đang làm...' : '--')}
-                            </td>
-
-                            {/* Trạng thái */}
-                            <td className="py-3 px-4">
-                              {item.isCompleted ? (
-                                <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
-                                  Hoàn Thành Cả Ngày ✓
-                                </span>
-                              ) : item.hasCheckedIn ? (
-                                <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
-                                  Đang Làm Việc ⏱️
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800/80 text-slate-500 border border-slate-700/60">
-                                  Chưa chấm công
-                                </span>
-                              )}
-                            </td>
-
-                            {/* GPS Maps link */}
-                            <td className="py-3 px-4 text-right">
-                              {item.mapsUrl ? (
-                                <a
-                                  href={item.mapsUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-emerald-400 rounded-lg text-[11px] font-bold transition-colors"
-                                >
-                                  <span>🗺️ Maps</span>
-                                  <span>↗</span>
-                                </a>
-                              ) : (
-                                <span className="text-slate-600 text-[11px]">--</span>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      })}
-
-                      {historyList.length === 0 && (
-                        <tr>
-                          <td colSpan="6" className="py-8 text-center text-slate-500 text-xs">
-                            Chưa có dữ liệu nào trong khoảng ngày đã chọn.
-                          </td>
+                  {/* GIAO DIỆN MÁY TÍNH (Desktop Table View): whitespace-nowrap chống vỡ chữ, ĐÃ BỎ CỘT MAP */}
+                  <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-200">
+                    <table className="w-full text-left border-collapse min-w-[620px]">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-600 whitespace-nowrap">
+                          <th className="py-3.5 px-4">Ngày</th>
+                          <th className="py-3.5 px-4">Giờ Vào (Check-In)</th>
+                          <th className="py-3.5 px-4">Giờ Ra (Check-Out)</th>
+                          <th className="py-3.5 px-4">Thời Lượng</th>
+                          <th className="py-3.5 px-4 text-right">Trạng Thái</th>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-xs">
+                        {historyList.map((item) => {
+                          return (
+                            <tr
+                              key={item.date}
+                              className={`transition-colors ${
+                                item.isCompleted
+                                  ? 'bg-emerald-50/40'
+                                  : item.hasCheckedIn
+                                  ? 'bg-indigo-50/40'
+                                  : 'hover:bg-slate-50'
+                              }`}
+                            >
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <div className="font-bold text-slate-900">{item.formattedDate}</div>
+                                <div className="text-[10px] text-slate-500">{item.dayOfWeek}</div>
+                              </td>
+
+                              {/* Giờ Check-In */}
+                              <td className="py-3 px-4 font-mono font-bold whitespace-nowrap">
+                                {item.checkInRec ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    <span>🟢</span>
+                                    <span>{item.checkInRec.formattedTime}</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">--:--</span>
+                                )}
+                              </td>
+
+                              {/* Giờ Check-Out */}
+                              <td className="py-3 px-4 font-mono font-bold whitespace-nowrap">
+                                {item.checkOutRec ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-800 border border-rose-200">
+                                    <span>🔴</span>
+                                    <span>{item.checkOutRec.formattedTime}</span>
+                                  </span>
+                                ) : item.hasCheckedIn ? (
+                                  <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 whitespace-nowrap">
+                                    Chưa Check-Out
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">--:--</span>
+                                )}
+                              </td>
+
+                              {/* Thời lượng làm việc */}
+                              <td className="py-3 px-4 font-medium text-slate-700 whitespace-nowrap">
+                                {item.totalWorkTimeStr || (item.hasCheckedIn && !item.hasCheckedOut ? 'Đang làm...' : '--')}
+                              </td>
+
+                              {/* Trạng thái */}
+                              <td className="py-3 px-4 text-right whitespace-nowrap">
+                                {item.isCompleted ? (
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 whitespace-nowrap inline-flex items-center gap-1">
+                                    Hoàn Thành Cả Ngày ✓
+                                  </span>
+                                ) : item.hasCheckedIn ? (
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-800 border border-indigo-200 whitespace-nowrap inline-flex items-center gap-1">
+                                    Đang Làm Việc ⏱️
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200 whitespace-nowrap">
+                                    Chưa chấm công
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -1386,14 +1511,14 @@ function App() {
 
         {/* ---------------- TAB 3: DANH BẠ NHÂN VIÊN (GETEMPLOYEES) ---------------- */}
         {activeTab === 'employees' && (
-          <div className="space-y-6 text-left">
-            <div className="bg-[#0D1527]/85 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border border-white/[0.08] space-y-4">
+          <div className="space-y-5 text-left">
+            <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-base font-bold text-white">
+                  <h3 className="text-base font-bold text-slate-900">
                     Danh Sách Nhân Viên Công Ty ({employees.length})
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500">
                     Được tải trực tiếp từ Smart Contract bằng hàm <code>getEmployees()</code> (Method ID:{' '}
                     <code>0x4abefa36</code>)
                   </p>
@@ -1402,7 +1527,7 @@ function App() {
                 <button
                   onClick={handleLoadEmployees}
                   disabled={employeesLoading}
-                  className="px-4 py-2 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 self-start sm:self-auto disabled:opacity-50 cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 self-start sm:self-auto disabled:opacity-50 cursor-pointer"
                 >
                   <span className={employeesLoading ? 'animate-spin' : ''}>🔄</span>
                   <span>Làm mới danh sách</span>
@@ -1416,54 +1541,54 @@ function App() {
                   placeholder="🔍 Tìm kiếm theo họ tên hoặc địa chỉ ví..."
                   value={employeeSearch}
                   onChange={(e) => setEmployeeSearch(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl border border-slate-700/80 text-sm font-medium focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 bg-slate-950/80 text-slate-100 placeholder:text-slate-500"
+                  className="w-full px-4 py-3 rounded-2xl border border-slate-300 text-sm font-medium focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 bg-white text-slate-900 placeholder:text-slate-400"
                 />
               </div>
 
               {/* Bảng nhân viên */}
               {employeesLoading && employees.length === 0 ? (
-                <div className="p-12 text-center text-slate-400">
-                  <span className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin inline-block mb-3"></span>
+                <div className="p-12 text-center text-slate-500">
+                  <span className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin inline-block mb-3"></span>
                   <p className="text-xs font-semibold">Đang giải mã danh bạ từ Smart Contract...</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-2xl border border-white/[0.07] bg-slate-950/40">
+                <div className="overflow-x-auto rounded-2xl border border-slate-200">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="bg-slate-950/80 border-b border-white/[0.07] text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-600">
                         <th className="py-3 px-4 w-14">#</th>
                         <th className="py-3 px-4">Họ và Tên</th>
                         <th className="py-3 px-4">Địa Chỉ Ví</th>
                         <th className="py-3 px-4 text-right">Thao Tác</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/[0.05] text-xs">
+                    <tbody className="divide-y divide-slate-100 text-xs">
                       {filteredEmployees.map((emp) => {
                         const isMe = emp.wallet.toLowerCase() === currentAccount.address.toLowerCase()
                         return (
                           <tr
                             key={emp.wallet + emp.index}
-                            className={`transition-colors ${isMe ? 'bg-indigo-500/10 border-l-2 border-indigo-400 font-medium' : 'hover:bg-white/[0.02]'}`}
+                            className={`transition-colors ${isMe ? 'bg-indigo-50/70 border-l-4 border-indigo-600 font-medium' : 'hover:bg-slate-50'}`}
                           >
-                            <td className="py-3 px-4 font-mono text-slate-500">#{emp.index}</td>
+                            <td className="py-3 px-4 font-mono text-slate-400">#{emp.index}</td>
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2">
-                                <span className="font-bold text-white">{emp.name}</span>
+                                <span className="font-bold text-slate-900">{emp.name}</span>
                                 {isMe && (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500 text-white shadow-xs">
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-600 text-white shadow-xs">
                                     Bạn
                                   </span>
                                 )}
                               </div>
                             </td>
-                            <td className="py-3 px-4 font-mono text-slate-400">
+                            <td className="py-3 px-4 font-mono text-slate-600">
                               <span className="hidden sm:inline">{emp.wallet}</span>
                               <span className="sm:hidden">{`${emp.wallet.slice(0, 8)}...${emp.wallet.slice(-6)}`}</span>
                             </td>
                             <td className="py-3 px-4 text-right">
                               <button
                                 onClick={() => copyToClipboard(emp.wallet)}
-                                className="px-2.5 py-1 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 rounded-lg text-[11px] font-semibold text-slate-300 transition-colors cursor-pointer"
+                                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-700 transition-colors cursor-pointer"
                               >
                                 {copiedHash ? '✓ Đã chép' : 'Sao chép ví'}
                               </button>
@@ -1489,56 +1614,56 @@ function App() {
 
         {/* ---------------- TAB 4: CẤU HÌNH CA & VAI TRÒ (SHIFTS & ROLES) ---------------- */}
         {activeTab === 'shifts' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
             {/* Cấu hình giờ ca làm việc */}
-            <div className="bg-[#0D1527]/85 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border border-white/[0.08] space-y-4">
+            <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-base font-bold text-white">Cấu Hình Ca Làm Việc</h3>
-                  <p className="text-xs text-slate-400">
+                  <h3 className="text-base font-bold text-slate-900">Cấu Hình Ca Làm Việc</h3>
+                  <p className="text-xs text-slate-500">
                     Lấy từ hàm <code>getShiftConfig()</code> (<code>0x9dece72c</code>)
                   </p>
                 </div>
                 <span className="text-2xl">⏰</span>
               </div>
 
-              <div className="space-y-3 pt-2">
-                <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/[0.06] flex items-center justify-between">
+              <div className="space-y-3 pt-1">
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
                   <div>
-                    <span className="text-xs text-slate-400 font-semibold block">Ca Sáng Bắt Đầu</span>
-                    <span className="text-lg font-black text-emerald-400 font-mono">08:00 AM</span>
+                    <span className="text-xs text-slate-500 font-semibold block">Ca Sáng Bắt Đầu</span>
+                    <span className="text-lg font-black text-emerald-700 font-mono">08:00 AM</span>
                   </div>
-                  <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded-md border border-slate-800">
+                  <span className="text-xs font-mono text-slate-500 bg-white px-2.5 py-1 rounded-md border border-slate-200">
                     28,800 giây
                   </span>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/[0.06] flex items-center justify-between">
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
                   <div>
-                    <span className="text-xs text-slate-400 font-semibold block">Ca Sáng Kết Thúc</span>
-                    <span className="text-lg font-black text-emerald-400 font-mono">12:00 PM</span>
+                    <span className="text-xs text-slate-500 font-semibold block">Ca Sáng Kết Thúc</span>
+                    <span className="text-lg font-black text-emerald-700 font-mono">12:00 PM</span>
                   </div>
-                  <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded-md border border-slate-800">
+                  <span className="text-xs font-mono text-slate-500 bg-white px-2.5 py-1 rounded-md border border-slate-200">
                     43,200 giây
                   </span>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/[0.06] flex items-center justify-between">
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
                   <div>
-                    <span className="text-xs text-slate-400 font-semibold block">Ca Chiều Bắt Đầu</span>
-                    <span className="text-lg font-black text-indigo-400 font-mono">13:30 PM (1:30 chiều)</span>
+                    <span className="text-xs text-slate-500 font-semibold block">Ca Chiều Bắt Đầu</span>
+                    <span className="text-lg font-black text-indigo-700 font-mono">13:30 PM (1:30 chiều)</span>
                   </div>
-                  <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded-md border border-slate-800">
+                  <span className="text-xs font-mono text-slate-500 bg-white px-2.5 py-1 rounded-md border border-slate-200">
                     48,600 giây
                   </span>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/[0.06] flex items-center justify-between">
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
                   <div>
-                    <span className="text-xs text-slate-400 font-semibold block">Ca Chiều Kết Thúc</span>
-                    <span className="text-lg font-black text-indigo-400 font-mono">17:30 PM (5:30 chiều)</span>
+                    <span className="text-xs text-slate-500 font-semibold block">Ca Chiều Kết Thúc</span>
+                    <span className="text-lg font-black text-indigo-700 font-mono">17:30 PM (5:30 chiều)</span>
                   </div>
-                  <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded-md border border-slate-800">
+                  <span className="text-xs font-mono text-slate-500 bg-white px-2.5 py-1 rounded-md border border-slate-200">
                     63,000 giây
                   </span>
                 </div>
@@ -1546,41 +1671,41 @@ function App() {
             </div>
 
             {/* Danh sách vai trò & Quyền hạn */}
-            <div className="bg-[#0D1527]/85 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border border-white/[0.08] space-y-4">
+            <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-base font-bold text-white">Danh Sách Vai Trò (Roles)</h3>
-                  <p className="text-xs text-slate-400">
+                  <h3 className="text-base font-bold text-slate-900">Danh Sách Vai Trò (Roles)</h3>
+                  <p className="text-xs text-slate-500">
                     Lấy từ hàm <code>getRoles()</code> (<code>0x71061398</code>)
                   </p>
                 </div>
                 <span className="text-2xl">🛡️</span>
               </div>
 
-              <div className="space-y-3 pt-2">
-                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between">
+              <div className="space-y-3 pt-1">
+                <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
                   <div>
-                    <div className="text-sm font-bold text-emerald-300">Vai Trò ID: 1</div>
-                    <div className="text-xs text-emerald-400/80">User / Nhân viên điểm danh thông thường</div>
+                    <div className="text-sm font-bold text-emerald-900">Vai Trò ID: 1</div>
+                    <div className="text-xs text-emerald-700">User / Nhân viên điểm danh thông thường</div>
                   </div>
-                  <span className="text-xs font-bold px-2.5 py-1 bg-emerald-500 text-slate-950 rounded-full">
+                  <span className="text-xs font-bold px-2.5 py-1 bg-emerald-600 text-white rounded-full shadow-xs">
                     Kích hoạt
                   </span>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-between">
+                <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-between">
                   <div>
-                    <div className="text-sm font-bold text-indigo-300">Vai Trò ID: 4</div>
-                    <div className="text-xs text-indigo-400/80">Manager / Quản lý ca làm việc</div>
+                    <div className="text-sm font-bold text-indigo-900">Vai Trò ID: 4</div>
+                    <div className="text-xs text-indigo-700">Manager / Quản lý ca làm việc</div>
                   </div>
-                  <span className="text-xs font-bold px-2.5 py-1 bg-indigo-500 text-white rounded-full">
+                  <span className="text-xs font-bold px-2.5 py-1 bg-indigo-600 text-white rounded-full shadow-xs">
                     Kích hoạt
                   </span>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/[0.06] text-xs text-slate-400 space-y-1">
-                <span className="font-bold text-slate-300 block">Lưu ý bảo mật:</span>
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
+                <span className="font-bold text-slate-800 block">Lưu ý bảo mật:</span>
                 <p>
                   Tài khoản chủ sở hữu cần mật khẩu để đăng nhập ví mặc định. Các nhân viên khác có thể kết nối ví của
                   họ bằng Private Key riêng.
@@ -1593,13 +1718,11 @@ function App() {
 
       {/* 3. Popup Modal thông báo giao dịch */}
       {popup.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-[#0F172A] border border-white/10 rounded-3xl p-6 shadow-2xl max-w-sm w-full transform transition-all scale-100 text-center space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl max-w-sm w-full transform transition-all scale-100 text-center space-y-4">
             <div
               className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center ${
-                popup.type === 'success'
-                  ? 'bg-emerald-500/15 border border-emerald-500/25 text-emerald-400'
-                  : 'bg-rose-500/15 border border-rose-500/25 text-rose-400'
+                popup.type === 'success' ? 'bg-emerald-50 border border-emerald-200 text-emerald-600' : 'bg-rose-50 border border-rose-200 text-rose-600'
               }`}
             >
               {popup.type === 'success' ? (
@@ -1614,17 +1737,17 @@ function App() {
             </div>
 
             <div>
-              <h3 className="text-lg font-black text-white">{popup.title}</h3>
-              <p className="text-xs text-slate-300 mt-1 whitespace-pre-line leading-relaxed">{popup.message}</p>
+              <h3 className="text-lg font-black text-slate-900">{popup.title}</h3>
+              <p className="text-xs text-slate-600 mt-1 whitespace-pre-line leading-relaxed">{popup.message}</p>
             </div>
 
             {popup.hash && (
-              <div className="p-3 bg-slate-950/80 rounded-xl border border-white/[0.07] text-left">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Transaction Hash</span>
-                <p className="text-xs font-mono text-emerald-400 break-all">{popup.hash}</p>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-left">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-1">Transaction Hash</span>
+                <p className="text-xs font-mono text-emerald-700 break-all">{popup.hash}</p>
                 <button
                   onClick={() => copyToClipboard(popup.hash)}
-                  className="mt-2 text-xs font-semibold text-emerald-400 hover:text-emerald-300 hover:underline block"
+                  className="mt-2 text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline block cursor-pointer"
                 >
                   {copiedHash ? '✓ Đã sao chép hash' : 'Sao chép Transaction Hash'}
                 </button>
@@ -1633,7 +1756,7 @@ function App() {
 
             <button
               onClick={closePopup}
-              className="w-full py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold rounded-xl transition-colors active:scale-95 text-xs cursor-pointer"
+              className="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl transition-colors active:scale-95 text-xs cursor-pointer"
             >
               Đóng
             </button>
