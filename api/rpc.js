@@ -17,8 +17,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // URL RPC HTTP gốc (hardcoded)
-  const TARGET_RPC_URL = 'http://116.109.66.229:10746';
+  // Khi chạy remote (Vercel Serverless Function), gọi vào IP WAN để truy cập từ ngoài Internet
+  const TARGET_RPC_URL = process.env.REMOTE_RPC_URL || 'http://116.109.66.229:10746';
 
   try {
     const payload = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
