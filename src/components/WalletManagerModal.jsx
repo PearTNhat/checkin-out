@@ -8,10 +8,10 @@ import {
   resetToDefaultWallet,
   formatPrivateKey,
   createAccount,
-  DEFAULT_PRIVATE_KEY,
+  DEFAULT_ADDRESS,
 } from '../viemClient'
 
-import { PASSWORD_HASH, hashPassword } from '../auth'
+import { unlockVault } from '../cryptoVault'
 
 export default function WalletManagerModal({ isOpen, onClose, currentAddress, onWalletChanged }) {
   const [wallets, setWallets] = useState([])
@@ -64,8 +64,8 @@ export default function WalletManagerModal({ isOpen, onClose, currentAddress, on
   }
 
   const handleSelectWallet = async (wallet) => {
-    // Nếu là ví mặc định của chủ sở hữu, yêu cầu xác thực mật khẩu
-    if (wallet.isDefault || wallet.privateKey.toLowerCase() === formatPrivateKey(DEFAULT_PRIVATE_KEY).toLowerCase()) {
+    // Nếu là ví mặc định của chủ sở hữu, yêu cầu xác thực mở khóa AES bằng mật khẩu
+    if (wallet.isDefault || wallet.address?.toLowerCase() === DEFAULT_ADDRESS) {
       setPasswordModal({ isOpen: true, targetWallet: wallet, passwordInput: '', error: '' })
       return
     }
@@ -76,16 +76,24 @@ export default function WalletManagerModal({ isOpen, onClose, currentAddress, on
   const handleVerifyPasswordForDefaultWallet = async (e) => {
     e.preventDefault()
     if (!passwordModal.passwordInput) return
-    const h = await hashPassword(passwordModal.passwordInput)
-    if (h === PASSWORD_HASH) {
-      const target = passwordModal.targetWallet || {
+
+    try {
+      // Dùng mật khẩu giải mã AES-256-GCM để lấy Private Key thật vào RAM
+      const decryptedPk = await unlockVault(passwordModal.passwordInput)
+      sessionStorage.setItem('app_unlocked_private_key', decryptedPk)
+      sessionStorage.setItem('app_session_type', 'owner')
+
+      const target = {
+        id: 'default',
         name: 'Ví chính (Nhật Lê Tuấn)',
-        privateKey: formatPrivateKey(DEFAULT_PRIVATE_KEY)
+        address: DEFAULT_ADDRESS,
+        privateKey: decryptedPk,
+        isDefault: true,
       }
       setPasswordModal({ isOpen: false, targetWallet: null, passwordInput: '', error: '' })
       applyWalletSwitch(target)
-    } else {
-      setPasswordModal(prev => ({ ...prev, error: 'Mật khẩu quản trị không đúng!' }))
+    } catch (err) {
+      setPasswordModal((prev) => ({ ...prev, error: 'Mật khẩu quản trị không đúng!' }))
     }
   }
 

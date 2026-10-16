@@ -28,20 +28,23 @@ export const customChain = defineChain({
 // Địa chỉ Smart Contract chấm công
 export const CONTRACT_ADDRESS = "0xfa7eab272d80dd940af6044bae1f8a0f986eb72a"
 
-// Private Key mặc định ban đầu
-export const DEFAULT_PRIVATE_KEY = "72aa91a272ca13df75f51127145ca538fed2b9c0a2157c7a751d4c1f79edf5ad"
+// Địa chỉ ví chủ sở hữu (Công khai) - Private Key được bảo vệ bằng AES-256-GCM trong cryptoVault.js
 export const DEFAULT_ADDRESS = "0x5b9bd6157d69771aac09c7c9b2e2ca78bd9a8173".toLowerCase()
 
 // Kiểm tra xem private key có phải là ví mặc định của chủ sở hữu không
 export const isDefaultKey = (key) => {
   if (!key) return false
-  const formatted = formatPrivateKey(key).toLowerCase()
-  const def = formatPrivateKey(DEFAULT_PRIVATE_KEY).toLowerCase()
-  return formatted === def
+  try {
+    const acc = privateKeyToAccount(formatPrivateKey(key))
+    return acc.address.toLowerCase() === DEFAULT_ADDRESS
+  } catch {
+    return false
+  }
 }
 
 const STORAGE_KEY_ACTIVE_KEY = 'app_wallet_private_key'
 const STORAGE_KEY_WALLETS = 'app_saved_wallets'
+const SESSION_KEY_UNLOCKED = 'app_unlocked_private_key'
 
 // Chuẩn hóa định dạng private key (phải có 0x)
 export const formatPrivateKey = (key) => {
@@ -52,30 +55,46 @@ export const formatPrivateKey = (key) => {
 
 // Lấy Private Key đang kích hoạt
 export const getActivePrivateKey = () => {
-  if (typeof window === 'undefined') return formatPrivateKey(DEFAULT_PRIVATE_KEY)
+  if (typeof window === 'undefined') return ''
+  // 1. Kiểm tra session key trong RAM (cho ví chủ sau khi mở khóa AES thành công)
+  const sessionKey = sessionStorage.getItem(SESSION_KEY_UNLOCKED)
+  if (sessionKey) return formatPrivateKey(sessionKey)
+
+  // 2. Kiểm tra key của ví khác đã lưu
   const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_KEY)
-  return saved ? formatPrivateKey(saved) : formatPrivateKey(DEFAULT_PRIVATE_KEY)
+  return saved ? formatPrivateKey(saved) : ''
 }
 
 // Khởi tạo Account từ một private key
 export const createAccount = (privateKey) => {
-  const formatted = formatPrivateKey(privateKey || getActivePrivateKey())
+  const pk = privateKey || getActivePrivateKey()
+  if (!pk) {
+    // Nếu chưa đăng nhập / chưa mở khóa AES, trả về account giả định chỉ đọc với DEFAULT_ADDRESS
+    return {
+      address: DEFAULT_ADDRESS,
+      type: 'json-rpc',
+    }
+  }
+  const formatted = formatPrivateKey(pk)
   return privateKeyToAccount(formatted)
 }
 
 // Tạo WalletClient từ Account
 export const createClientsForAccount = (acc) => {
   const currentRpc = getRpcUrl()
-  const walletClient = createWalletClient({
-    account: acc,
-    chain: customChain,
-    transport: http(currentRpc),
-  })
-
   const publicClient = createPublicClient({
     chain: customChain,
     transport: http(currentRpc),
   })
+
+  let walletClient = null
+  if (acc && typeof acc.signTransaction === 'function') {
+    walletClient = createWalletClient({
+      account: acc,
+      chain: customChain,
+      transport: http(currentRpc),
+    })
+  }
 
   return { walletClient, publicClient }
 }
@@ -86,14 +105,13 @@ export const getSavedWallets = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_WALLETS)
     if (!raw) {
-      // Khởi tạo danh sách mặc định có ví ban đầu
-      const defaultAcc = privateKeyToAccount(formatPrivateKey(DEFAULT_PRIVATE_KEY))
+      // Khởi tạo danh sách mặc định (không lưu Private Key dạng chữ rõ)
       const initial = [
         {
           id: 'default',
           name: 'Ví chính (Nhật Lê Tuấn)',
-          address: defaultAcc.address,
-          privateKey: formatPrivateKey(DEFAULT_PRIVATE_KEY),
+          address: DEFAULT_ADDRESS,
+          privateKey: '', // Được bảo vệ bằng AES-256 Vault
           isDefault: true,
         },
       ]
@@ -118,7 +136,7 @@ export const saveWallet = (name, privateKey) => {
     name: name || `Ví ${acc.address.slice(0, 6)}...${acc.address.slice(-4)}`,
     address: acc.address,
     privateKey: formatted,
-    isDefault: formatted.toLowerCase() === formatPrivateKey(DEFAULT_PRIVATE_KEY).toLowerCase(),
+    isDefault: acc.address.toLowerCase() === DEFAULT_ADDRESS,
   }
 
   if (existingIndex >= 0) {
@@ -149,7 +167,10 @@ export const setActivePrivateKey = (privateKey) => {
 
 // Khôi phục ví mặc định
 export const resetToDefaultWallet = () => {
-  setActivePrivateKey(DEFAULT_PRIVATE_KEY)
+  const sessionKey = sessionStorage.getItem(SESSION_KEY_UNLOCKED)
+  if (sessionKey) {
+    setActivePrivateKey(sessionKey)
+  }
 }
 
 // Khởi tạo các instance mặc định ban đầu để các module khác import trực tiếp

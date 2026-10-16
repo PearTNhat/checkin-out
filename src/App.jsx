@@ -11,11 +11,10 @@ import {
   getSavedWallets,
   saveWallet,
   formatPrivateKey,
-  DEFAULT_PRIVATE_KEY,
   DEFAULT_ADDRESS,
   isDefaultKey,
 } from './viemClient'
-import { PASSWORD_HASH, hashPassword } from './auth'
+import { unlockVault } from './cryptoVault'
 import WalletManagerModal from './components/WalletManagerModal'
 import {
   sendCheckInTx,
@@ -96,19 +95,22 @@ function App() {
   // Đồng hồ thời gian thực
   const [currentTime, setCurrentTime] = useState(new Date())
 
-  // Kiểm tra phiên đăng nhập lưu sẵn
+  // Kiểm tra phiên đăng nhập lưu sẵn (Bảo vệ bằng AES Vault)
   useEffect(() => {
-    const sessionType = localStorage.getItem('app_session_type')
-    const savedHash = localStorage.getItem('app_auth_hash')
-
-    if (sessionType === 'owner' && savedHash === PASSWORD_HASH) {
-      // Khôi phục ví mặc định
-      setActivePrivateKey(DEFAULT_PRIVATE_KEY)
-      setIsAuthenticated(true)
+    const sessionType = sessionStorage.getItem('app_session_type') || localStorage.getItem('app_session_type')
+    if (sessionType === 'owner') {
+      const unlockedKey = sessionStorage.getItem('app_unlocked_private_key')
+      if (unlockedKey) {
+        // Đã mở khóa AES thành công trong phiên này
+        setActivePrivateKey(unlockedKey)
+        setIsAuthenticated(true)
+      } else {
+        // Chưa mở khóa AES trong phiên này -> Phải nhập mật khẩu để giải mã
+        setIsAuthenticated(false)
+      }
     } else if (sessionType === 'guest') {
-      // Khôi phục ví khách
       const savedKey = localStorage.getItem('app_wallet_private_key')
-      if (savedKey && !isDefaultKey(savedKey)) {
+      if (savedKey) {
         setIsAuthenticated(true)
       }
     }
@@ -219,20 +221,25 @@ function App() {
     loadInitialData()
   }, [loadInitialData])
 
-  // 1. Đăng nhập Ví Mặc Định (Cần mật khẩu)
+  // 1. Đăng nhập Ví Mặc Định (Mở khóa AES-256-GCM bằng Mật khẩu)
   const handleOwnerLogin = async (e) => {
     e.preventDefault()
     if (password.trim() === '') return
+    setLoginError('')
 
-    const inputHash = await hashPassword(password)
-    if (inputHash === PASSWORD_HASH) {
-      localStorage.setItem('app_auth_hash', inputHash)
-      localStorage.setItem('app_session_type', 'owner')
-      setActivePrivateKey(DEFAULT_PRIVATE_KEY)
+    try {
+      // Dùng mật khẩu giải mã Private Key qua AES-256-GCM + PBKDF2
+      const decryptedPk = await unlockVault(password)
+
+      // Lưu Private Key đã giải mã vào RAM (sessionStorage của riêng tab này)
+      sessionStorage.setItem('app_unlocked_private_key', decryptedPk)
+      sessionStorage.setItem('app_session_type', 'owner')
+
+      setActivePrivateKey(decryptedPk)
       refreshWalletState()
       setIsAuthenticated(true)
-      setLoginError('')
-    } else {
+      setPassword('')
+    } catch (err) {
       setLoginError('Mật khẩu quản trị không đúng!')
     }
   }
@@ -265,10 +272,12 @@ function App() {
     }
   }
 
-  // Đăng xuất
+  // Đăng xuất (Xóa Private Key khỏi RAM)
   const handleLogout = () => {
-    localStorage.removeItem('app_auth_hash')
+    sessionStorage.removeItem('app_unlocked_private_key')
+    sessionStorage.removeItem('app_session_type')
     localStorage.removeItem('app_session_type')
+    localStorage.removeItem('app_auth_hash')
     setPassword('')
     setGuestKey('')
     setIsAuthenticated(false)
