@@ -23,8 +23,18 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Khi chạy remote (Vercel Serverless Function), gọi qua ngrok hoặc biến môi trường REMOTE_RPC_URL
-  const TARGET_RPC_URL = process.env.REMOTE_RPC_URL || 'https://giant-legroom-predator.ngrok-free.dev';
+  // Lấy URL RPC từ biến môi trường VITE_RPC_URL, báo lỗi nếu chưa cấu hình
+  const TARGET_RPC_URL = process.env.VITE_RPC_URL;
+  if (!TARGET_RPC_URL) {
+    return res.status(500).json({
+      jsonrpc: '2.0',
+      id: req.body?.id || null,
+      error: {
+        code: -32603,
+        message: 'Lỗi: Chưa cấu hình biến môi trường VITE_RPC_URL',
+      },
+    });
+  }
 
   try {
     let payload;

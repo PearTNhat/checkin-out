@@ -5,6 +5,11 @@ import { defineChain } from 'viem'
 // Bỏ qua lỗi chứng chỉ SSL của server Blockchain
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
+const rpcUrl = process.env.VITE_RPC_URL;
+if (!rpcUrl) {
+  throw new Error('Lỗi: Chưa cấu hình biến môi trường VITE_RPC_URL');
+}
+
 // Khai báo cấu hình mạng lưới tùy chỉnh
 const customChain = defineChain({
   id: 991,
@@ -12,7 +17,7 @@ const customChain = defineChain({
   network: 'custom991',
   nativeCurrency: { decimals: 18, name: 'Ether', symbol: 'ETH' },
   rpcUrls: {
-    default: { http: ['https://rpc-proxy-sequoia.iqnb.com:8446'] },
+    default: { http: [rpcUrl] },
   },
 })
 

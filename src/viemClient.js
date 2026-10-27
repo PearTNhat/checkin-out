@@ -1,12 +1,13 @@
 import { createWalletClient, createPublicClient, http, defineChain } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
-// Lấy RPC URL qua proxy API (/api/rpc) để tránh lỗi Mixed Content và xử lý CORS/SSL
+// Lấy RPC URL trực tiếp từ biến môi trường VITE_RPC_URL (bắt buộc cấu hình trong .env)
 export const getRpcUrl = () => {
-  if (typeof window !== 'undefined') {
-    return `${window.location.origin}/api/rpc`
+  const url = import.meta.env?.VITE_RPC_URL
+  if (!url) {
+    throw new Error('Lỗi: Chưa cấu hình biến môi trường VITE_RPC_URL trong file .env')
   }
-  return 'http://localhost:5173/api/rpc'
+  return url
 }
 
 // Khai báo cấu hình mạng lưới tùy chỉnh (Chain ID: 991)
