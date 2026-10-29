@@ -26,8 +26,8 @@ export const customChain = defineChain({
   },
 })
 
-// Địa chỉ Smart Contract chấm công
-export const CONTRACT_ADDRESS = "0xfa7eab272d80dd940af6044bae1f8a0f986eb72a"
+// Địa chỉ Smart Contract chấm công (Tập trung tại contractConfig.js)
+export { CONTRACT_ADDRESS } from './contractConfig'
 
 // Địa chỉ ví chủ sở hữu (Công khai) - Private Key được bảo vệ bằng AES-256-GCM trong cryptoVault.js
 export const DEFAULT_ADDRESS = "0x5b9bd6157d69771aac09c7c9b2e2ca78bd9a8173".toLowerCase()
